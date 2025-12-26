@@ -1,31 +1,49 @@
 const router = require("express").Router();
 const ctrl = require("./progress.controller");
 const auth = require("../../middlewares/auth");
+const projectAccess = require("../../middlewares/projectAccess");
+const milestoneAccess = require("../../middlewares/milestoneAccess");
 
 /**
- * @swagger
- * tags:
- *   name: Progress
+ * ✅ GET /api/progress/project/:projectId/summary
  */
+router.get("/project/:projectId/summary", auth, projectAccess(), ctrl.summary);
 
 /**
- * @swagger
- * /api/progress/{projectId}:
- *   get:
- *     summary: Get project milestones
- *     tags: [Progress]
- *     security: [{ bearerAuth: [] }]
+ * ✅ GET /api/progress/project/:projectId
  */
-router.get("/:projectId", auth, ctrl.list);
+router.get("/project/:projectId", auth, projectAccess(), ctrl.list);
 
 /**
- * @swagger
- * /api/progress/milestone/{milestoneId}:
- *   patch:
- *     summary: Update milestone progress
- *     tags: [Progress]
- *     security: [{ bearerAuth: [] }]
+ * ✅ POST /api/progress
+ * Body must include: projectId, name
  */
-router.patch("/milestone/:milestoneId", auth, ctrl.update);
+router.post(
+  "/",
+  auth,
+  projectAccess(["PROJECT_MANAGER", "TEAM_LEADER"]),
+  ctrl.create
+);
+
+/**
+ * ✅ PATCH /api/progress/milestone/:milestoneId
+ * Body: { progress }
+ */
+router.patch(
+  "/milestone/:milestoneId",
+  auth,
+  milestoneAccess(["PROJECT_MANAGER", "TEAM_LEADER"]),
+  ctrl.update
+);
+
+/**
+ * ✅ DELETE /api/progress/milestone/:milestoneId
+ */
+router.delete(
+  "/milestone/:milestoneId",
+  auth,
+  milestoneAccess(["PROJECT_MANAGER", "TEAM_LEADER"]),
+  ctrl.remove
+);
 
 module.exports = router;

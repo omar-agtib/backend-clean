@@ -1,5 +1,5 @@
+// modules/nonConformity/nc.controller.js
 const asyncHandler = require("../../utils/asyncHandler");
-const NC = require("./nc.model");
 const service = require("./nc.service");
 
 exports.create = asyncHandler(async (req, res) => {
@@ -8,15 +8,17 @@ exports.create = asyncHandler(async (req, res) => {
 });
 
 exports.assign = asyncHandler(async (req, res) => {
-  const nc = await NC.findById(req.params.ncId);
-  const updated = await service.assign(nc, req.body.assignedTo, req.user.id);
+  const updated = await service.assign(
+    req.nc,
+    req.body.assignedTo,
+    req.user.id
+  );
   res.json(updated);
 });
 
 exports.changeStatus = asyncHandler(async (req, res) => {
-  const nc = await NC.findById(req.params.ncId);
   const updated = await service.changeStatus(
-    nc,
+    req.nc,
     req.body.status,
     req.user.id,
     req.body.comment
@@ -26,5 +28,10 @@ exports.changeStatus = asyncHandler(async (req, res) => {
 
 exports.list = asyncHandler(async (req, res) => {
   const list = await service.listByProject(req.params.projectId);
+  res.json(list);
+});
+
+exports.history = asyncHandler(async (req, res) => {
+  const list = await service.getHistory(req.params.ncId);
   res.json(list);
 });

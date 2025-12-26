@@ -1,6 +1,7 @@
 module.exports = (...allowedRoles) => {
   return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
+    const role = req.user?.role;
+    if (!role || !allowedRoles.includes(role)) {
       return res.status(403).json({ message: "Forbidden" });
     }
     next();

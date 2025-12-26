@@ -1,65 +1,90 @@
+// modules/tools/tool.routes.js
 const router = require("express").Router();
 const ctrl = require("./tool.controller");
 const auth = require("../../middlewares/auth");
+const projectAccess = require("../../middlewares/projectAccess");
+const toolAccess = require("../../middlewares/toolAccess");
+const maintenanceAccess = require("../../middlewares/maintenanceAccess");
 
 /**
- * @swagger
- * tags:
- *   name: Tools
+ * Inventory
  */
-
-/**
- * @swagger
- * /api/tools:
- *   get:
- *     summary: List all tools
- *     tags: [Tools]
- *     security: [{ bearerAuth: [] }]
- */
+router.post("/", auth, ctrl.createTool);
 router.get("/", auth, ctrl.getTools);
 
 /**
- * @swagger
- * /api/tools/assign:
- *   post:
- *     summary: Assign a tool to a user/project
- *     tags: [Tools]
- *     security: [{ bearerAuth: [] }]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - toolId
- *             properties:
- *               toolId:
- *                 type: string
- *               projectId:
- *                 type: string
+ * A) Available tools (inventory)
  */
-router.post("/assign", auth, ctrl.assignTool);
+router.get("/available", auth, ctrl.getAvailableTools);
 
 /**
- * @swagger
- * /api/tools/return:
- *   post:
- *     summary: Return an assigned tool
- *     tags: [Tools]
- *     security: [{ bearerAuth: [] }]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - toolId
- *             properties:
- *               toolId:
- *                 type: string
+ * Assign (projectId is required to create relation)
  */
-router.post("/return", auth, ctrl.returnTool);
+router.post(
+  "/assign",
+  auth,
+  projectAccess(["PROJECT_MANAGER", "TEAM_LEADER"]),
+  ctrl.assignTool
+);
+
+/**
+ * Return (project derived from active assignment)
+ */
+router.post(
+  "/return",
+  auth,
+  toolAccess(["PROJECT_MANAGER", "TEAM_LEADER"]),
+  ctrl.returnTool
+);
+
+/**
+ * Maintenance start (projectId required to create record)
+ */
+router.post(
+  "/maintenance/start",
+  auth,
+  projectAccess(["PROJECT_MANAGER", "TEAM_LEADER"]),
+  ctrl.startMaintenance
+);
+
+/**
+ * Maintenance complete (project derived from maintenanceId)
+ */
+router.post(
+  "/maintenance/complete",
+  auth,
+  maintenanceAccess(["PROJECT_MANAGER", "TEAM_LEADER"]),
+  ctrl.completeMaintenance
+);
+
+/**
+ * Project history (all assignments)
+ */
+router.get(
+  "/project/:projectId/assignments",
+  auth,
+  projectAccess(),
+  ctrl.listAssignmentsByProject
+);
+
+/**
+ * B) Project active assignments only
+ */
+router.get(
+  "/project/:projectId/assigned",
+  auth,
+  projectAccess(),
+  ctrl.listActiveAssignedByProject
+);
+
+/**
+ * C) Project maintenance history
+ */
+router.get(
+  "/project/:projectId/maintenance",
+  auth,
+  projectAccess(),
+  ctrl.listMaintenanceByProject
+);
 
 module.exports = router;

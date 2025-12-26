@@ -1,51 +1,51 @@
+// modules/stock/stock.routes.js
 const router = require("express").Router();
 const ctrl = require("./stock.controller");
 const auth = require("../../middlewares/auth");
+const projectAccess = require("../../middlewares/projectAccess");
+const stockAccess = require("../../middlewares/stockAccess");
 
-/**
- * @swagger
- * tags:
- *   name: Stock
- */
+// Create a stock item for project
+router.post(
+  "/items",
+  auth,
+  projectAccess(["PROJECT_MANAGER", "TEAM_LEADER"]),
+  ctrl.createItem
+);
 
-/**
- * @swagger
- * /api/stock:
- *   get:
- *     summary: Get all stock items
- *     tags: [Stock]
- *     security: [{ bearerAuth: [] }]
- */
-router.get("/", auth, ctrl.getStock);
+// List stock items for a project
+router.get("/project/:projectId", auth, projectAccess(), ctrl.getByProject);
 
-/**
- * @swagger
- * /api/stock/adjust:
- *   post:
- *     summary: Adjust stock quantity (IN / OUT)
- *     tags: [Stock]
- *     security: [{ bearerAuth: [] }]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - stockItemId
- *               - type
- *               - quantity
- *             properties:
- *               stockItemId:
- *                 type: string
- *               type:
- *                 type: string
- *                 enum: [IN, OUT]
- *               quantity:
- *                 type: number
- *               reason:
- *                 type: string
- */
-router.post("/adjust", auth, ctrl.adjustStock);
+// List movements for a project
+router.get(
+  "/project/:projectId/movements",
+  auth,
+  projectAccess(),
+  ctrl.getMovementsByProject
+);
+
+// ✅ Get one stock item
+router.get(
+  "/items/:stockItemId",
+  auth,
+  stockAccess(), // checks membership via stockItem.projectId
+  ctrl.getOne
+);
+
+// ✅ Movements for one stock item
+router.get(
+  "/items/:stockItemId/movements",
+  auth,
+  stockAccess(),
+  ctrl.getMovementsByStockItem
+);
+
+// Adjust stock (IN / OUT)
+router.post(
+  "/adjust",
+  auth,
+  stockAccess(["PROJECT_MANAGER", "TEAM_LEADER"]),
+  ctrl.adjustStock
+);
 
 module.exports = router;

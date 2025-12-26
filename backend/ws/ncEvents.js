@@ -1,4 +1,4 @@
-const { getIO } = require("./index");
+const { getIO } = require("./io");
 const { projectRoom } = require("./rooms");
 
 function ncCreated(projectId, nc) {

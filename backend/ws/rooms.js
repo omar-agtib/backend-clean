@@ -1,7 +1,10 @@
+// ws/rooms.js
 function projectRoom(projectId) {
   return `project:${projectId}`;
 }
 
-module.exports = {
-  projectRoom,
-};
+function userRoom(userId) {
+  return `user:${userId}`;
+}
+
+module.exports = { projectRoom, userRoom };

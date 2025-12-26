@@ -1,41 +1,48 @@
+// modules/billing/billing.routes.js
 const router = require("express").Router();
 const ctrl = require("./billing.controller");
 const auth = require("../../middlewares/auth");
+const projectAccess = require("../../middlewares/projectAccess");
+const invoiceAccess = require("../../middlewares/invoiceAccess");
 
 /**
- * @swagger
- * tags:
- *   name: Billing
+ * POST /api/billing
  */
+router.post("/", auth, projectAccess(["PROJECT_MANAGER"]), ctrl.create);
 
 /**
- * @swagger
- * /api/billing:
- *   get:
- *     summary: List invoices
- *     tags: [Billing]
- *     security: [{ bearerAuth: [] }]
+ * ✅ GET /api/billing/project/:projectId/summary
  */
-router.get("/", auth, ctrl.list);
+router.get("/project/:projectId/summary", auth, projectAccess(), ctrl.summary);
 
 /**
- * @swagger
- * /api/billing:
- *   post:
- *     summary: Create invoice
- *     tags: [Billing]
- *     security: [{ bearerAuth: [] }]
+ * GET /api/billing/project/:projectId
  */
-router.post("/", auth, ctrl.create);
+router.get("/project/:projectId", auth, projectAccess(), ctrl.listByProject);
 
 /**
- * @swagger
- * /api/billing/{invoiceId}/pay:
- *   post:
- *     summary: Mark invoice as paid
- *     tags: [Billing]
- *     security: [{ bearerAuth: [] }]
+ * GET /api/billing/:invoiceId
  */
-router.post("/:invoiceId/pay", auth, ctrl.markPaid);
+router.get("/:invoiceId", auth, invoiceAccess(), ctrl.getOne);
+
+/**
+ * POST /api/billing/:invoiceId/pay
+ */
+router.post(
+  "/:invoiceId/pay",
+  auth,
+  invoiceAccess(["PROJECT_MANAGER"]),
+  ctrl.markPaid
+);
+
+/**
+ * ✅ POST /api/billing/:invoiceId/cancel
+ */
+router.post(
+  "/:invoiceId/cancel",
+  auth,
+  invoiceAccess(["PROJECT_MANAGER"]),
+  ctrl.cancel
+);
 
 module.exports = router;

@@ -1,3 +1,4 @@
+// modules/plans/planVersion.model.js
 const mongoose = require("mongoose");
 
 const PlanVersionSchema = new mongoose.Schema(
@@ -6,17 +7,46 @@ const PlanVersionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Plan",
       required: true,
-      index: true,
     },
+
+    projectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      required: true,
+    },
+
     versionNumber: {
       type: Number,
       required: true,
     },
-    filePath: {
-      type: String,
+
+    file: {
+      url: { type: String, required: true },
+      publicId: { type: String, required: true },
+      bytes: Number,
+      resourceType: { type: String, default: "raw" },
+      originalName: String,
+    },
+
+    // 🔍 Audit
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       required: true,
     },
-    createdBy: {
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
+    // 🗑 Soft delete
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: Date,
+    deletedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
@@ -24,6 +54,9 @@ const PlanVersionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-PlanVersionSchema.index({ planId: 1, versionNumber: -1 });
+// ✅ Indexes (single source of truth → no duplicates)
+PlanVersionSchema.index({ planId: 1, versionNumber: -1 }); // list versions quickly
+PlanVersionSchema.index({ projectId: 1 }); // fetch by project
+PlanVersionSchema.index({ planId: 1, isDeleted: 1 }); // list active versions quickly
 
 module.exports = mongoose.model("PlanVersion", PlanVersionSchema);

@@ -1,14 +1,11 @@
+// modules/nonConformity/nc.routes.js
 const router = require("express").Router();
 const auth = require("../../middlewares/auth");
 const projectAccess = require("../../middlewares/projectAccess");
+const ncAccess = require("../../middlewares/ncAccess");
 const ctrl = require("./nc.controller");
 
-/**
- * @swagger
- * tags:
- *   name: Non-Conformities
- */
-
+// Create NC (projectId in body)
 router.post(
   "/",
   auth,
@@ -16,20 +13,16 @@ router.post(
   ctrl.create
 );
 
+// List by project
 router.get("/project/:projectId", auth, projectAccess(), ctrl.list);
 
-router.post(
-  "/:ncId/assign",
-  auth,
-  projectAccess(["PROJECT_MANAGER"]),
-  ctrl.assign
-);
+// Assign (projectId derived from ncId)
+router.post("/:ncId/assign", auth, ncAccess(["PROJECT_MANAGER"]), ctrl.assign);
 
-router.post(
-  "/:ncId/status",
-  auth,
-  projectAccess(["QUALITY"]),
-  ctrl.changeStatus
-);
+// Change status (projectId derived from ncId)
+router.post("/:ncId/status", auth, ncAccess(["QUALITY"]), ctrl.changeStatus);
+
+// ✅ History timeline
+router.get("/:ncId/history", auth, ncAccess(), ctrl.history);
 
 module.exports = router;

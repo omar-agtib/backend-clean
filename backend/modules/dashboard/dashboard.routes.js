@@ -1,14 +1,13 @@
+// modules/dashboard/dashboard.routes.js
 const router = require("express").Router();
 const auth = require("../../middlewares/auth");
 const projectAccess = require("../../middlewares/projectAccess");
 const ctrl = require("./dashboard.controller");
 
 /**
- * @swagger
- * tags:
- *   name: Dashboard
+ * GET /api/dashboard/project/:projectId
+ * Project dashboard KPIs
  */
-
 router.get(
   "/project/:projectId",
   auth,

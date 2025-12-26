@@ -1,3 +1,4 @@
+// backend/server.js
 require("dotenv").config();
 const http = require("http");
 
@@ -5,32 +6,59 @@ const http = require("http");
 const app = require("./app");
 
 // Config
-const { port } = require("./config/env");
+const { port, mongoUri } = require("./config/env");
+const logger = require("./config/logger");
 
-// Loaders
-const connectDB = require("./loaders/mongoose");
+// DB
+const connectDb = require("./config/db");
+
+// WS
 const { initWebSocket } = require("./ws");
+
+let server;
 
 async function startServer() {
   try {
-    // Connect to MongoDB
-    await connectDB();
+    await connectDb(mongoUri);
 
-    // Create HTTP server
-    const server = http.createServer(app);
+    server = http.createServer(app);
 
-    // Init WebSocket
     initWebSocket(server);
 
-    // Start listening
     server.listen(port, () => {
-      console.log(`🚀 Server running on port ${port}`);
-      console.log(`📘 Swagger: http://localhost:${port}/api-docs`);
+      logger.info(`🚀 Server running on port ${port}`);
+      logger.info(`📘 Swagger: http://localhost:${port}/api-docs`);
     });
   } catch (err) {
-    console.error("❌ Server failed to start:", err);
+    logger.error("❌ Server failed to start", {
+      message: err.message,
+      stack: err.stack,
+    });
     process.exit(1);
   }
 }
+
+async function shutdown(signal) {
+  try {
+    logger.warn(`🛑 Received ${signal}, shutting down...`);
+
+    if (server) {
+      await new Promise((resolve) => server.close(resolve));
+      logger.info("HTTP server closed");
+    }
+
+    const mongoose = require("mongoose");
+    await mongoose.disconnect();
+    logger.info("MongoDB disconnected");
+
+    process.exit(0);
+  } catch (err) {
+    logger.error("Shutdown error", { message: err.message });
+    process.exit(1);
+  }
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 startServer();

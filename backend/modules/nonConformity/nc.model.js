@@ -1,3 +1,4 @@
+// modules/nonConformity/nc.model.js
 const mongoose = require("mongoose");
 
 const NcSchema = new mongoose.Schema(
@@ -6,17 +7,15 @@ const NcSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Project",
       required: true,
-      index: true,
     },
 
-    title: { type: String, required: true },
-    description: String,
+    title: { type: String, required: true, trim: true },
+    description: { type: String, default: "" },
 
     status: {
       type: String,
       enum: ["OPEN", "IN_PROGRESS", "RESOLVED", "VALIDATED"],
       default: "OPEN",
-      index: true,
     },
 
     priority: {
@@ -36,13 +35,20 @@ const NcSchema = new mongoose.Schema(
 
     attachments: [String],
 
+    // Audit
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    isDeleted: { type: Boolean, default: false },
+
+    // Soft delete
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: Date,
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
 );
 
+// ✅ Indexes (single source of truth)
 NcSchema.index({ projectId: 1, status: 1 });
+NcSchema.index({ projectId: 1, priority: 1 });
 
 module.exports = mongoose.model("NonConformity", NcSchema);

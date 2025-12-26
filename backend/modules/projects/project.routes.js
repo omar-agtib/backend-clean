@@ -1,3 +1,4 @@
+// modules/projects/project.routes.js
 const router = require("express").Router();
 const ctrl = require("./project.controller");
 const auth = require("../../middlewares/auth");
@@ -9,34 +10,32 @@ const projectAccess = require("../../middlewares/projectAccess");
  *   name: Projects
  */
 
-/**
- * @swagger
- * /api/projects:
- *   post:
- *     summary: Create project
- *     tags: [Projects]
- *     security: [{ bearerAuth: [] }]
- */
+// Create project
 router.post("/", auth, ctrl.create);
 
-/**
- * @swagger
- * /api/projects:
- *   get:
- *     summary: List my projects
- *     tags: [Projects]
- *     security: [{ bearerAuth: [] }]
- */
+// List my projects
 router.get("/", auth, ctrl.listMine);
 
-/**
- * @swagger
- * /api/projects/{projectId}/members:
- *   post:
- *     summary: Add project member
- *     tags: [Projects]
- *     security: [{ bearerAuth: [] }]
- */
+// Get one project
+router.get("/:projectId", auth, projectAccess(), ctrl.getOne);
+
+// Update project (only managers)
+router.patch(
+  "/:projectId",
+  auth,
+  projectAccess(["PROJECT_MANAGER"]),
+  ctrl.update
+);
+
+// Soft delete project (only managers)
+router.delete(
+  "/:projectId",
+  auth,
+  projectAccess(["PROJECT_MANAGER"]),
+  ctrl.remove
+);
+
+// Add member
 router.post(
   "/:projectId/members",
   auth,
@@ -44,14 +43,7 @@ router.post(
   ctrl.addMember
 );
 
-/**
- * @swagger
- * /api/projects/{projectId}/members:
- *   delete:
- *     summary: Remove project member
- *     tags: [Projects]
- *     security: [{ bearerAuth: [] }]
- */
+// Remove member
 router.delete(
   "/:projectId/members",
   auth,

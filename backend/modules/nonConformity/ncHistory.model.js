@@ -1,3 +1,4 @@
+// modules/nonConformity/ncHistory.model.js
 const mongoose = require("mongoose");
 
 const NcHistorySchema = new mongoose.Schema(
@@ -11,14 +12,8 @@ const NcHistorySchema = new mongoose.Schema(
 
     action: {
       type: String,
-      enum: [
-        "CREATED",
-        "ASSIGNED",
-        "STATUS_CHANGED",
-        "RESOLVED",
-        "VALIDATED",
-        "REJECTED",
-      ],
+      enum: ["CREATED", "ASSIGNED", "STATUS_CHANGED", "VALIDATED"],
+      required: true,
     },
 
     fromStatus: String,
@@ -27,11 +22,14 @@ const NcHistorySchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      required: true,
     },
 
     comment: String,
   },
   { timestamps: true }
 );
+
+NcHistorySchema.index({ ncId: 1, createdAt: 1 });
 
 module.exports = mongoose.model("NcHistory", NcHistorySchema);

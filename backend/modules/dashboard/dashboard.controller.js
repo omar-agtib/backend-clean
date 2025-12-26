@@ -1,3 +1,4 @@
+// modules/dashboard/dashboard.controller.js
 const asyncHandler = require("../../utils/asyncHandler");
 const service = require("./dashboard.service");
 

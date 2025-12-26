@@ -1,17 +1,35 @@
+// modules/stock/stock.controller.js
 const asyncHandler = require("express-async-handler");
-const StockItem = require("./stockItem.model");
-const { adjustStock } = require("./stock.service");
+const service = require("./stock.service");
 
-exports.getStock = asyncHandler(async (req, res) => {
-  const stock = await StockItem.find().populate("productId");
+exports.createItem = asyncHandler(async (req, res) => {
+  const { projectId, productId, quantity, location } = req.body;
+
+  const item = await service.createStockItem(
+    projectId,
+    productId,
+    quantity ?? 0,
+    location
+  );
+
+  res.status(201).json(item);
+});
+
+exports.getByProject = asyncHandler(async (req, res) => {
+  const stock = await service.listStockByProject(req.params.projectId);
   res.json(stock);
 });
 
-exports.adjustStock = asyncHandler(async (req, res) => {
-  const { stockItemId, type, quantity, reason } = req.body;
+exports.getOne = asyncHandler(async (req, res) => {
+  const item = await service.getStockItem(req.params.stockItemId);
+  res.json(item);
+});
 
-  const item = await adjustStock(
-    stockItemId,
+exports.adjustStock = asyncHandler(async (req, res) => {
+  const { type, quantity, reason } = req.body;
+
+  const item = await service.adjustStock(
+    req.stockItem._id,
     type,
     quantity,
     req.user.id,
@@ -19,4 +37,16 @@ exports.adjustStock = asyncHandler(async (req, res) => {
   );
 
   res.json(item);
+});
+
+exports.getMovementsByProject = asyncHandler(async (req, res) => {
+  const movements = await service.listMovementsByProject(req.params.projectId);
+  res.json(movements);
+});
+
+exports.getMovementsByStockItem = asyncHandler(async (req, res) => {
+  const movements = await service.listMovementsByStockItem(
+    req.params.stockItemId
+  );
+  res.json(movements);
 });

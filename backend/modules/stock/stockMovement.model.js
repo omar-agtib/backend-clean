@@ -3,7 +3,14 @@ const { ObjectId } = mongoose.Schema.Types;
 
 const StockMovementSchema = new mongoose.Schema(
   {
-    stockItemId: { type: ObjectId, ref: "StockItem", required: true },
+    projectId: { type: ObjectId, ref: "Project", required: true, index: true }, // ✅
+    stockItemId: {
+      type: ObjectId,
+      ref: "StockItem",
+      required: true,
+      index: true,
+    },
+
     type: { type: String, enum: ["IN", "OUT"], required: true },
     quantity: { type: Number, required: true },
     reason: String,
