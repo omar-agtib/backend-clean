@@ -67,3 +67,8 @@ exports.logout = asyncHandler(async (req, res) => {
   res.clearCookie(COOKIE_NAME, cookieOptions());
   res.json({ message: "Logged out" });
 });
+
+exports.me = asyncHandler(async (req, res) => {
+  const user = await service.me(req.user.id);
+  res.json(user);
+});

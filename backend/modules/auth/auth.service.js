@@ -127,3 +127,15 @@ exports.logout = async ({ refreshToken }) => {
   const refreshTokenHash = hashRefresh(refreshToken);
   await Session.updateOne({ refreshTokenHash }, { isRevoked: true });
 };
+
+exports.me = async (userId) => {
+  const user = await User.findById(userId).select(
+    "_id email name role isActive isDeleted"
+  );
+  if (!user || user.isDeleted || !user.isActive) {
+    const err = new Error("User inactive");
+    err.status = 401;
+    throw err;
+  }
+  return user;
+};

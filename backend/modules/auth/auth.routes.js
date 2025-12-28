@@ -1,6 +1,12 @@
-// modules/auth/auth.routes.js
 const router = require("express").Router();
 const ctrl = require("./auth.controller");
+const auth = require("../../middlewares/auth");
+
+/**
+ * @swagger
+ * tags:
+ *   name: Auth
+ */
 
 /**
  * @swagger
@@ -15,27 +21,31 @@ router.post("/register", ctrl.register);
  * @swagger
  * /api/auth/login:
  *   post:
- *     summary: Login (sets refresh cookie)
+ *     summary: Login
  *     tags: [Auth]
  */
 router.post("/login", ctrl.login);
 
 /**
  * @swagger
- * /api/auth/refresh:
+ * /api/auth/logout:
  *   post:
- *     summary: Refresh access token (uses refresh cookie)
+ *     summary: Logout
  *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
  */
-router.post("/refresh", ctrl.refresh);
+router.post("/logout", auth, ctrl.logout);
 
 /**
  * @swagger
- * /api/auth/logout:
- *   post:
- *     summary: Logout (revokes refresh session)
+ * /api/auth/me:
+ *   get:
+ *     summary: Get current user
  *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
  */
-router.post("/logout", ctrl.logout);
+router.get("/me", auth, ctrl.me);
 
 module.exports = router;
