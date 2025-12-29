@@ -4,7 +4,9 @@ export type Plan = {
   _id: string;
   projectId: string;
 
-  title: string;
+  // backend field
+  name: string;
+
   description?: string;
 
   createdBy?: string;
@@ -41,7 +43,7 @@ export type PlanVersion = {
 
 export type CreatePlanDto = {
   projectId: string;
-  title: string;
+  name: string; // ✅ backend expects name
   description?: string;
 };
 
@@ -60,21 +62,14 @@ export async function listPlanVersions(planId: string) {
   return data;
 }
 
-/**
- * Upload a new version for a plan.
- * Backend usually expects multipart/form-data with field "file".
- * If your backend expects another field name, change "file" below.
- */
 export async function uploadPlanVersion(planId: string, file: File) {
   const form = new FormData();
   form.append("file", file);
 
   const { data } = await http.post<PlanVersion>(
-    `/plans/${planId}/versions`,
+    `/plans/${planId}/versions/upload`,
     form,
-    {
-      headers: { "Content-Type": "multipart/form-data" },
-    }
+    { headers: { "Content-Type": "multipart/form-data" } }
   );
 
   return data;

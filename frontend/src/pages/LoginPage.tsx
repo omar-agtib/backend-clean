@@ -10,7 +10,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const login = useLogin();
 
-  const [email, setEmail] = useState("omar@admin.com");
+  const [email, setEmail] = useState("owner@test.com");
   const [password, setPassword] = useState("123456");
 
   useEffect(() => {

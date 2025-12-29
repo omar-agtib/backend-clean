@@ -1,10 +1,11 @@
 // src/pages/ProjectWorkspacePage.tsx
 import { useMemo, useState } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation, useParams } from "react-router-dom";
 
 import EmptyState from "../components/EmptyState";
 import PlansPanel from "../features/plans/components/PlansPanel";
 import { useProjectStore } from "../store/projectStore";
+import NcPanel from "../features/nc/components/NcPanel";
 
 type TabKey = "plans" | "nc" | "progress" | "stock" | "tools" | "billing";
 
@@ -35,23 +36,25 @@ function Tab({
   );
 }
 
-/**
- * ProjectWorkspacePage
- * - Uses activeProject from Zustand store
- * - Shows tabs for modules
- * - Plans tab is fully connected (PlansPanel)
- * - Others are placeholders for now
- */
 export default function ProjectWorkspacePage() {
   const location = useLocation();
+  const params = useParams();
 
-  const projectId = useProjectStore((s) => s.activeProjectId);
-  const projectName = useProjectStore((s) => s.activeProjectName);
+  // ✅ route param (source of truth)
+  const routeProjectId = params.projectId;
 
-  // determine tab from URL query (?tab=plans)
+  // ✅ store (optional nice-to-have for showing name)
+  const storeProjectId = useProjectStore((s) => s.activeProjectId);
+  const storeProjectName = useProjectStore((s) => s.activeProjectName);
+
+  // ✅ use route first, fallback to store
+  const projectId = routeProjectId || storeProjectId;
+  const projectName = storeProjectName;
+
+  // ✅ tab from query string
   const tab: TabKey = useMemo(() => {
-    const params = new URLSearchParams(location.search);
-    const t = (params.get("tab") || "plans") as TabKey;
+    const p = new URLSearchParams(location.search);
+    const t = (p.get("tab") || "plans") as TabKey;
     const allowed: TabKey[] = [
       "plans",
       "nc",
@@ -63,17 +66,14 @@ export default function ProjectWorkspacePage() {
     return allowed.includes(t) ? t : "plans";
   }, [location.search]);
 
-  // optional local state (not required but keeps UI snappy)
   const [activeTab, setActiveTab] = useState<TabKey>(tab);
-
-  // sync when URL changes
   if (activeTab !== tab) setActiveTab(tab);
 
   if (!projectId) {
     return (
       <EmptyState
         title="No project selected"
-        subtitle="Select a project first (Projects page) then come back here."
+        subtitle="Go to Projects and open a project workspace."
         action={
           <Link
             to="/app/projects"
@@ -86,7 +86,8 @@ export default function ProjectWorkspacePage() {
     );
   }
 
-  const base = "/app/workspace";
+  // ✅ IMPORTANT: tabs must stay inside /app/projects/:projectId
+  const base = `/app/projects/${projectId}`;
 
   return (
     <div className="space-y-4">
@@ -153,14 +154,7 @@ export default function ProjectWorkspacePage() {
       {/* Content */}
       {activeTab === "plans" && <PlansPanel projectId={projectId} />}
 
-      {activeTab === "nc" && (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-          <div className="font-semibold text-slate-900">NC (Coming next)</div>
-          <div className="text-sm text-slate-600 mt-1">
-            We will plug: list + create + assign + status flow + notifications.
-          </div>
-        </div>
-      )}
+      {activeTab === "nc" && <NcPanel projectId={projectId} />}
 
       {activeTab === "progress" && (
         <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">

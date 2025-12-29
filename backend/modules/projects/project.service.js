@@ -17,6 +17,13 @@ function notFound(message) {
   return err;
 }
 
+// ✅ common populate (members names + owner)
+function projectPopulate(q) {
+  return q
+    .populate("owner", "name email role")
+    .populate("members.userId", "name email role");
+}
+
 exports.createProject = async (data, userId) => {
   if (!data?.name || !String(data.name).trim())
     throw badRequest("name is required");
@@ -26,30 +33,39 @@ exports.createProject = async (data, userId) => {
     description: data.description ? String(data.description).trim() : undefined,
     status: data.status || "PLANNING",
     owner: userId,
-    members: [{ userId, role: "PROJECT_MANAGER" }], // owner is manager
+    members: [{ userId, role: "PROJECT_MANAGER" }],
     startDate: data.startDate,
     endDate: data.endDate,
     createdBy: userId,
   });
 
   projectEvents.projectCreated(project);
-  return project;
+
+  // ✅ return populated
+  const populated = await projectPopulate(
+    Project.findById(project._id).where({ isDeleted: false })
+  );
+  return populated;
 };
 
 exports.listProjectsForUser = async (userId) => {
-  return Project.find({
-    isDeleted: false,
-    $or: [{ owner: userId }, { "members.userId": userId }],
-  }).sort({ createdAt: -1 });
+  return projectPopulate(
+    Project.find({
+      isDeleted: false,
+      $or: [{ owner: userId }, { "members.userId": userId }],
+    }).sort({ createdAt: -1 })
+  );
 };
 
 exports.getById = async (projectId) => {
   if (!mongoose.isValidObjectId(projectId))
     throw badRequest("Invalid projectId");
 
-  const project = await Project.findOne({ _id: projectId, isDeleted: false });
-  if (!project) throw notFound("Project not found");
+  const project = await projectPopulate(
+    Project.findOne({ _id: projectId, isDeleted: false })
+  );
 
+  if (!project) throw notFound("Project not found");
   return project;
 };
 
@@ -88,7 +104,11 @@ exports.updateProject = async (project, data, userId) => {
     status: project.status,
   });
 
-  return project;
+  // ✅ return populated
+  const populated = await projectPopulate(
+    Project.findById(project._id).where({ isDeleted: false })
+  );
+  return populated;
 };
 
 exports.softDeleteProject = async (project, userId) => {
@@ -126,7 +146,11 @@ exports.addMember = async (project, userId, role) => {
 
   projectEvents.memberAdded(project._id, { userId, role });
 
-  return project;
+  // ✅ return populated
+  const populated = await projectPopulate(
+    Project.findById(project._id).where({ isDeleted: false })
+  );
+  return populated;
 };
 
 exports.removeMember = async (project, userId) => {
@@ -135,7 +159,6 @@ exports.removeMember = async (project, userId) => {
 
   const uid = String(userId);
 
-  // 🚫 cannot remove owner
   if (String(project.owner) === uid) {
     const err = new Error("Cannot remove project owner");
     err.status = 409;
@@ -153,12 +176,10 @@ exports.removeMember = async (project, userId) => {
     throw err;
   }
 
-  // 🚫 cannot remove last PROJECT_MANAGER
   const managersLeft = project.members.filter(
     (m) => m.role === "PROJECT_MANAGER"
   ).length;
   if (removedMember?.role === "PROJECT_MANAGER" && managersLeft === 0) {
-    // rollback
     project.members.push(removedMember);
     const err = new Error("Cannot remove the last PROJECT_MANAGER");
     err.status = 409;
@@ -168,5 +189,10 @@ exports.removeMember = async (project, userId) => {
   await project.save();
 
   projectEvents.memberRemoved(project._id, uid);
-  return project;
+
+  // ✅ return populated
+  const populated = await projectPopulate(
+    Project.findById(project._id).where({ isDeleted: false })
+  );
+  return populated;
 };

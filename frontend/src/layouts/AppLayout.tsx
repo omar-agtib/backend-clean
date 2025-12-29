@@ -1,7 +1,9 @@
+// src/layouts/AppLayout.tsx
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import LogoMark from "../components/LogoMark";
+import ToastHost from "../components/ToastHost";
 import { token } from "../lib/token";
 import { useMe } from "../features/auth/hooks/useMe";
-import LogoMark from "../components/LogoMark";
 import { useProjectStore } from "../store/projectStore";
 
 function Item({ to, label }: { to: string; label: string }) {
@@ -26,12 +28,10 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const me = useMe();
 
-  const activeProjectName = useProjectStore((s) => s.activeProjectId);
-  const clearActiveProject = useProjectStore((s) => s.clearActiveProject);
+  const activeProjectName = useProjectStore((s) => s.activeProjectName);
 
   function logout() {
     token.clear();
-    clearActiveProject();
     navigate("/login", { replace: true });
   }
 
@@ -43,20 +43,27 @@ export default function AppLayout() {
             <LogoMark className="h-9 w-9 text-slate-900" />
             <div className="leading-tight">
               <div className="font-bold text-slate-900">Chantier Platform</div>
+
               <div className="text-xs text-slate-500">
-                {activeProjectName
-                  ? `Project: ${activeProjectName}`
-                  : me.data?.email || "No project selected"}
+                {me.data?.email || "—"}
+                {activeProjectName ? (
+                  <>
+                    {" "}
+                    · <span className="font-medium">{activeProjectName}</span>
+                  </>
+                ) : null}
               </div>
             </div>
           </div>
 
-          <nav className="flex items-center gap-2">
+          <nav className="flex items-center gap-2 flex-wrap justify-end">
             <Item to="/app" label="Dashboard" />
             <Item to="/app/projects" label="Projects" />
+            <Item to="/app/workspace" label="Workspace" />
             <Item to="/app/stock" label="Stock" />
             <Item to="/app/tools" label="Tools" />
             <Item to="/app/billing" label="Billing" />
+
             <button
               onClick={logout}
               className="ml-2 px-3 py-2 rounded-xl text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
@@ -70,6 +77,9 @@ export default function AppLayout() {
       <main className="max-w-6xl mx-auto px-4 py-6">
         <Outlet />
       </main>
+
+      {/* Global toasts */}
+      <ToastHost />
     </div>
   );
 }

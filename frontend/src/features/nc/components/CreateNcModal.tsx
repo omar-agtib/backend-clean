@@ -1,51 +1,42 @@
+// src/features/nc/components/NcCreateModal.tsx
 import { useMemo, useState } from "react";
 import type { NcPriority } from "../api/nc.api";
 
-export default function CreateNcModal({
-  projectId,
+export default function NcCreateModal({
+  open,
   onClose,
   onCreate,
   isPending,
   errorMessage,
 }: {
-  projectId: string;
+  open: boolean;
   onClose: () => void;
-  onCreate: (dto: {
-    projectId: string;
+  onCreate: (p: {
     title: string;
     description?: string;
     priority?: NcPriority;
   }) => void;
-  isPending: boolean;
-  errorMessage?: string | null;
+  isPending?: boolean;
+  errorMessage?: string;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<NcPriority>("MEDIUM");
 
-  const canSubmit = useMemo(() => !!title.trim(), [title]);
+  const canSubmit = useMemo(() => title.trim().length > 0, [title]);
 
-  function submit() {
-    if (!canSubmit) return;
-    onCreate({
-      projectId,
-      title: title.trim(),
-      description: description.trim() || undefined,
-      priority,
-    });
-  }
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+
       <div className="relative w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-xl p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-lg font-extrabold text-slate-900">
-              Create Non-Conformity
-            </div>
+            <div className="text-lg font-extrabold text-slate-900">New NC</div>
             <div className="text-sm text-slate-500 mt-1">
-              Title + optional details
+              Create a non-conformity item
             </div>
           </div>
           <button
@@ -63,7 +54,7 @@ export default function CreateNcModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900"
-              placeholder="Example: Concrete crack near column A2"
+              placeholder="Ex: Wrong material delivered"
             />
           </div>
 
@@ -75,7 +66,7 @@ export default function CreateNcModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="mt-1 w-full min-h-[90px] rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900"
-              placeholder="Add details..."
+              placeholder="More context..."
             />
           </div>
 
@@ -95,11 +86,11 @@ export default function CreateNcModal({
             </select>
           </div>
 
-          {errorMessage && (
+          {errorMessage ? (
             <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
               {errorMessage}
             </div>
-          )}
+          ) : null}
 
           <div className="flex justify-end gap-2 pt-2">
             <button
@@ -109,7 +100,13 @@ export default function CreateNcModal({
               Cancel
             </button>
             <button
-              onClick={submit}
+              onClick={() =>
+                onCreate({
+                  title: title.trim(),
+                  description: description.trim() || undefined,
+                  priority,
+                })
+              }
               disabled={!canSubmit || isPending}
               className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-900 text-white disabled:opacity-60"
             >

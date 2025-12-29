@@ -1,78 +1,185 @@
+// src/features/nc/components/NcPanel.tsx
 import { useMemo, useState } from "react";
+import NcCard from "./NcCard";
+import EmptyState from "../../../components/EmptyState";
+
+import NcAssignModal from "./NcAssignModal";
+import NcStatusModal from "./NcStatusModal";
+import NcDrawer from "./NcDrawer";
+import NcCreateModal from "./CreateNcModal";
+
 import { useNcList } from "../hooks/useNcList";
 import { useCreateNc } from "../hooks/useCreateNc";
 import { useAssignNc } from "../hooks/useAssignNc";
 import { useChangeNcStatus } from "../hooks/useChangeNcStatus";
-import type { NC } from "../api/nc.api";
-import { NcPriorityBadge, NcStatusBadge } from "./NcBadge";
-import CreateNcModal from "./CreateNcModal";
-import NcRowActions from "./NcRowActions";
+import { useNcRealtime } from "../hooks/useNcRealtime";
+
+import { useProjectMembers } from "../../projects/hooks/useProjectMembers";
+import type { Nc, NcStatus, NcPriority } from "../api/nc.api";
+
+type StatusFilter = NcStatus | "ALL";
+type PriorityFilter = NcPriority | "ALL";
+
+function Chip({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        "px-3 py-1.5 rounded-full text-xs font-semibold border transition",
+        active
+          ? "bg-slate-900 text-white border-slate-900"
+          : "bg-white text-slate-700 border-slate-200 hover:border-slate-300",
+      ].join(" ")}
+    >
+      {label}
+    </button>
+  );
+}
 
 export default function NcPanel({ projectId }: { projectId: string }) {
-  const q = useNcList(projectId);
-  const create = useCreateNc(projectId);
-  const assign = useAssignNc(projectId);
-  const changeStatus = useChangeNcStatus(projectId);
+  // realtime
+  useNcRealtime(projectId);
 
-  const [openCreate, setOpenCreate] = useState(false);
+  const q = useNcList(projectId);
+  const create = useCreateNc();
+  const assign = useAssignNc(projectId);
+  const change = useChangeNcStatus(projectId);
+
+  const { members, membersMap } = useProjectMembers(projectId);
+
   const [search, setSearch] = useState("");
 
-  const filtered = useMemo(() => {
+  // filters
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("ALL");
+
+  // Modals + drawer state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const [selected, setSelected] = useState<Nc | null>(null);
+
+  const counts = useMemo(() => {
     const list = q.data || [];
-    const s = search.trim().toLowerCase();
-    if (!s) return list;
-    return list.filter(
-      (n) =>
-        n.title.toLowerCase().includes(s) ||
-        (n.description || "").toLowerCase().includes(s) ||
-        (n.status || "").toLowerCase().includes(s)
-    );
-  }, [q.data, search]);
-
-  const busy = create.isPending || assign.isPending || changeStatus.isPending;
-
-  function prettyTime(iso: string) {
-    try {
-      return new Date(iso).toLocaleString();
-    } catch {
-      return iso;
+    const byStatus: Record<string, number> = {};
+    const byPriority: Record<string, number> = {};
+    for (const x of list) {
+      byStatus[x.status] = (byStatus[x.status] || 0) + 1;
+      byPriority[x.priority] = (byPriority[x.priority] || 0) + 1;
     }
-  }
+    return { byStatus, byPriority, total: list.length };
+  }, [q.data]);
+
+  const filtered = useMemo(() => {
+    let list = q.data || [];
+
+    const s = search.trim().toLowerCase();
+    if (s) {
+      list = list.filter(
+        (x) =>
+          x.title.toLowerCase().includes(s) ||
+          (x.description || "").toLowerCase().includes(s)
+      );
+    }
+
+    if (statusFilter !== "ALL") {
+      list = list.filter((x) => x.status === statusFilter);
+    }
+
+    if (priorityFilter !== "ALL") {
+      list = list.filter((x) => x.priority === priorityFilter);
+    }
+
+    return list;
+  }, [q.data, search, statusFilter, priorityFilter]);
 
   if (q.isLoading) {
     return (
       <div className="space-y-4">
         <div className="h-10 w-64 rounded-xl bg-slate-200 animate-pulse" />
-        <div className="h-28 rounded-2xl bg-slate-200 animate-pulse" />
-        <div className="h-28 rounded-2xl bg-slate-200 animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-28 rounded-2xl bg-slate-200 animate-pulse"
+            />
+          ))}
+        </div>
       </div>
     );
   }
 
   if (q.isError) {
     return (
-      <div className="rounded-2xl bg-red-50 border border-red-200 p-6">
-        <div className="font-semibold text-red-800">Failed to load NCs</div>
-        <div className="text-red-700 text-sm mt-1">
-          {(q.error as any)?.response?.data?.message ||
-            (q.error as Error).message}
-        </div>
-      </div>
+      <EmptyState
+        title="Failed to load NC"
+        subtitle={
+          (q.error as any)?.response?.data?.message ||
+          (q.error as Error).message
+        }
+        action={
+          <button
+            onClick={() => q.refetch()}
+            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Retry
+          </button>
+        }
+      />
     );
+  }
+
+  function openNc(nc: Nc) {
+    setSelected(nc);
+    setDrawerOpen(true);
+  }
+
+  async function doCreate(p: {
+    title: string;
+    description?: string;
+    priority?: NcPriority;
+  }) {
+    await create.mutateAsync({
+      projectId,
+      title: p.title,
+      description: p.description,
+      priority: p.priority,
+    });
+    setCreateOpen(false);
+  }
+
+  async function doAssign(userId: string) {
+    if (!selected) return;
+    await assign.mutateAsync({ ncId: selected._id, assignedTo: userId });
+    setAssignOpen(false);
+  }
+
+  async function doChangeStatus(status: NcStatus, comment?: string) {
+    if (!selected) return;
+    await change.mutateAsync({ ncId: selected._id, status, comment });
+    setStatusOpen(false);
   }
 
   const list = filtered;
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header row */}
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <div className="text-2xl font-extrabold text-slate-900">
-            Non-Conformities
-          </div>
+          <div className="text-xl font-extrabold text-slate-900">NC</div>
           <div className="text-sm text-slate-500">
-            Create, assign, and move status (workflow rules enforced by backend)
+            Track non-conformities (create, assign, status)
           </div>
         </div>
 
@@ -84,7 +191,7 @@ export default function NcPanel({ projectId }: { projectId: string }) {
             className="w-full sm:w-80 rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900 bg-white"
           />
           <button
-            onClick={() => setOpenCreate(true)}
+            onClick={() => setCreateOpen(true)}
             className="shrink-0 rounded-xl bg-slate-900 hover:bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
           >
             + New
@@ -92,96 +199,126 @@ export default function NcPanel({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      {/* Empty */}
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2">
+        <Chip
+          active={statusFilter === "ALL"}
+          label={`All (${counts.total})`}
+          onClick={() => setStatusFilter("ALL")}
+        />
+        <Chip
+          active={statusFilter === "OPEN"}
+          label={`Open (${counts.byStatus.OPEN || 0})`}
+          onClick={() => setStatusFilter("OPEN")}
+        />
+        <Chip
+          active={statusFilter === "IN_PROGRESS"}
+          label={`In Progress (${counts.byStatus.IN_PROGRESS || 0})`}
+          onClick={() => setStatusFilter("IN_PROGRESS")}
+        />
+        <Chip
+          active={statusFilter === "RESOLVED"}
+          label={`Resolved (${counts.byStatus.RESOLVED || 0})`}
+          onClick={() => setStatusFilter("RESOLVED")}
+        />
+        <Chip
+          active={statusFilter === "VALIDATED"}
+          label={`Validated (${counts.byStatus.VALIDATED || 0})`}
+          onClick={() => setStatusFilter("VALIDATED")}
+        />
+
+        <div className="w-full h-px bg-slate-100 my-1" />
+
+        <Chip
+          active={priorityFilter === "ALL"}
+          label="Priority: All"
+          onClick={() => setPriorityFilter("ALL")}
+        />
+        {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((p) => (
+          <Chip
+            key={p}
+            active={priorityFilter === p}
+            label={`${p} (${counts.byPriority[p] || 0})`}
+            onClick={() => setPriorityFilter(p)}
+          />
+        ))}
+      </div>
+
+      {/* List */}
       {list.length === 0 ? (
         <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-          <div className="font-semibold text-slate-900">No NCs found</div>
+          <div className="font-semibold text-slate-900">No NC found</div>
           <div className="text-sm text-slate-600 mt-1">
-            Create one to start tracking quality issues.
+            Try changing filters or create a new NC.
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          {list.map((nc: NC) => (
-            <div
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {list.map((nc) => (
+            <NcCard
               key={nc._id}
-              className="rounded-2xl bg-white border border-slate-200 shadow-sm p-5"
-            >
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div className="min-w-[220px]">
-                  <div className="font-extrabold text-slate-900">
-                    {nc.title}
-                  </div>
-                  {nc.description ? (
-                    <div className="text-sm text-slate-600 mt-1">
-                      {nc.description}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-slate-400 mt-1">
-                      No description
-                    </div>
-                  )}
-
-                  <div className="text-xs text-slate-400 mt-2">
-                    Updated: {prettyTime(nc.updatedAt)}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <NcStatusBadge status={nc.status} />
-                  <NcPriorityBadge priority={nc.priority} />
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <div className="text-sm text-slate-700 mb-2">
-                  <span className="font-semibold">AssignedTo:</span>{" "}
-                  <span className="text-slate-600">{nc.assignedTo || "—"}</span>
-                </div>
-
-                <NcRowActions
-                  nc={nc}
-                  busy={busy}
-                  onAssign={(assignedTo) =>
-                    assign.mutateAsync({ ncId: nc._id, assignedTo })
-                  }
-                  onStatus={(status, comment) =>
-                    changeStatus.mutateAsync({ ncId: nc._id, status, comment })
-                  }
-                />
-
-                {(assign.isError || changeStatus.isError) && (
-                  <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-                    {(assign.error as any)?.response?.data?.message ||
-                      (changeStatus.error as any)?.response?.data?.message ||
-                      (assign.error as Error)?.message ||
-                      (changeStatus.error as Error)?.message}
-                  </div>
-                )}
-              </div>
-            </div>
+              nc={nc}
+              onOpen={() => openNc(nc)}
+              assignedLabel={
+                nc.assignedTo ? membersMap[nc.assignedTo] || nc.assignedTo : "—"
+              }
+            />
           ))}
         </div>
       )}
 
-      {/* Create Modal */}
-      {openCreate && (
-        <CreateNcModal
-          projectId={projectId}
-          onClose={() => setOpenCreate(false)}
-          isPending={create.isPending}
-          errorMessage={
-            create.isError
-              ? (create.error as any)?.response?.data?.message ||
-                (create.error as Error).message
-              : null
-          }
-          onCreate={async (dto) => {
-            await create.mutateAsync(dto);
-            setOpenCreate(false);
-          }}
-        />
-      )}
+      {/* Create modal */}
+      <NcCreateModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreate={doCreate}
+        isPending={create.isPending}
+        errorMessage={
+          create.isError
+            ? (create.error as any)?.response?.data?.message ||
+              (create.error as Error).message
+            : undefined
+        }
+      />
+
+      {/* Drawer (with history inside) */}
+      <NcDrawer
+        open={drawerOpen}
+        nc={selected}
+        onClose={() => setDrawerOpen(false)}
+        onAssignClick={() => setAssignOpen(true)}
+        onStatusClick={() => setStatusOpen(true)}
+      />
+
+      {/* Assign modal */}
+      <NcAssignModal
+        open={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        members={members}
+        onAssign={doAssign}
+        isPending={assign.isPending}
+        errorMessage={
+          assign.isError
+            ? (assign.error as any)?.response?.data?.message ||
+              (assign.error as Error).message
+            : undefined
+        }
+      />
+
+      {/* Status modal */}
+      <NcStatusModal
+        open={statusOpen}
+        onClose={() => setStatusOpen(false)}
+        current={(selected?.status || "OPEN") as NcStatus}
+        onChange={doChangeStatus}
+        isPending={change.isPending}
+        errorMessage={
+          change.isError
+            ? (change.error as any)?.response?.data?.message ||
+              (change.error as Error).message
+            : undefined
+        }
+      />
     </div>
   );
 }

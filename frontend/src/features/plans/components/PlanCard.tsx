@@ -19,7 +19,8 @@ export default function PlanCard({
           : "bg-white border-slate-200 hover:bg-slate-50 text-slate-900",
       ].join(" ")}
     >
-      <div className="font-extrabold">{plan.title}</div>
+      <div className="font-extrabold">{plan.name}</div>
+
       <div
         className={
           isSelected
@@ -29,6 +30,7 @@ export default function PlanCard({
       >
         {plan.description || "No description"}
       </div>
+
       <div
         className={
           isSelected
