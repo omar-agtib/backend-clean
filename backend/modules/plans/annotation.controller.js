@@ -10,3 +10,16 @@ exports.list = asyncHandler(async (req, res) => {
   const list = await service.getAnnotations(req.params.planVersionId);
   res.json(list);
 });
+
+exports.update = asyncHandler(async (req, res) => {
+  const updated = await service.updateAnnotation(
+    req.params.annotationId,
+    req.body || {}
+  );
+  res.json(updated);
+});
+
+exports.remove = asyncHandler(async (req, res) => {
+  const result = await service.deleteAnnotation(req.params.annotationId);
+  res.json(result);
+});

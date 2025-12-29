@@ -1,22 +1,20 @@
+const mongoose = require("mongoose");
 const Annotation = require("./annotation.model");
 const PlanVersion = require("./planVersion.model");
 const Plan = require("./plan.model");
-const planEvents = require("../../ws/planEvents"); // WS events for plans
+const planEvents = require("../../ws/planEvents");
 
 /**
- * Create a new annotation
- * @param {Object} data - annotation data
- * @param {string} userId - creator ID
+ * Create annotation
  */
 exports.createAnnotation = async (data, userId) => {
-  // ✅ Basic validation (return clean 400 errors)
-  if (!data.planVersionId) {
+  if (!data?.planVersionId) {
     const err = new Error("planVersionId is required");
     err.status = 400;
     throw err;
   }
 
-  if (!data.type) {
+  if (!data?.type) {
     const err = new Error("type is required");
     err.status = 400;
     throw err;
@@ -28,19 +26,18 @@ exports.createAnnotation = async (data, userId) => {
     throw err;
   }
 
-  if (!data.geometry) {
+  if (!data?.geometry) {
     const err = new Error("geometry is required");
     err.status = 400;
     throw err;
   }
 
-  // ✅ Idempotency for offline sync
+  // idempotency (optional)
   if (data.clientId) {
     const existing = await Annotation.findOne({ clientId: data.clientId });
     if (existing) return existing;
   }
 
-  // 1) Get plan version
   const planVersion = await PlanVersion.findById(data.planVersionId);
   if (!planVersion) {
     const err = new Error("PlanVersion not found");
@@ -48,7 +45,6 @@ exports.createAnnotation = async (data, userId) => {
     throw err;
   }
 
-  // 2) Get plan to retrieve projectId
   const plan = await Plan.findById(planVersion.planId);
   if (!plan) {
     const err = new Error("Plan not found");
@@ -56,50 +52,99 @@ exports.createAnnotation = async (data, userId) => {
     throw err;
   }
 
-  // 3) Create annotation with projectId
   const annotation = await Annotation.create({
     ...data,
     projectId: plan.projectId,
     createdBy: userId,
   });
 
-  // 4) Emit WS event to project room
   planEvents.annotationAdded(plan.projectId, annotation);
-
   return annotation;
 };
 
 /**
- * Get all annotations for a plan version
- * @param {string} planVersionId
+ * List by planVersionId
  */
 exports.getAnnotations = async (planVersionId) => {
+  if (!mongoose.isValidObjectId(planVersionId)) {
+    const err = new Error("Invalid planVersionId");
+    err.status = 400;
+    throw err;
+  }
+
+  // mongoose will cast, but explicit is fine too
   return Annotation.find({ planVersionId }).sort({ createdAt: 1 });
 };
 
 /**
- * Delete an annotation (optional)
- * @param {string} annotationId
+ * Update annotation (move pin / edit content)
  */
-exports.deleteAnnotation = async (annotationId) => {
-  const annotation = await Annotation.findByIdAndDelete(annotationId);
-  if (!annotation) throw new Error("Annotation not found");
+exports.updateAnnotation = async (annotationId, data) => {
+  if (!mongoose.isValidObjectId(annotationId)) {
+    const err = new Error("Invalid annotationId");
+    err.status = 400;
+    throw err;
+  }
 
-  planEvents.annotationDeleted(annotation.projectId, annotationId);
-  return annotation;
+  const body = data || {};
+
+  // ✅ support both payloads:
+  // 1) { geometry: {...}, content: "..." }
+  // 2) { x: 1, y: 2, page: 1, content: "..." }  <-- will be converted
+  const computedGeometry =
+    body.geometry ??
+    (body.x !== undefined || body.y !== undefined || body.page !== undefined
+      ? { x: body.x, y: body.y, page: body.page }
+      : undefined);
+
+  const update = {};
+
+  if (computedGeometry !== undefined) update.geometry = computedGeometry;
+  if (body.content !== undefined) update.content = body.content;
+  if (body.type !== undefined) update.type = body.type;
+
+  // ✅ allow setting content to empty string
+  if (body.content === "") update.content = "";
+
+  if (Object.keys(update).length === 0) {
+    const err = new Error("Nothing to update");
+    err.status = 400;
+    throw err;
+  }
+
+  const updated = await Annotation.findByIdAndUpdate(
+    annotationId,
+    { $set: update },
+    { new: true }
+  );
+
+  if (!updated) {
+    const err = new Error("Annotation not found");
+    err.status = 404;
+    throw err;
+  }
+
+  planEvents.annotationUpdated(updated.projectId, updated);
+  return updated;
 };
 
 /**
- * Update an annotation (optional)
- * @param {string} annotationId
- * @param {Object} data
+ * Delete annotation
  */
-exports.updateAnnotation = async (annotationId, data) => {
-  const annotation = await Annotation.findByIdAndUpdate(annotationId, data, {
-    new: true,
-  });
-  if (!annotation) throw new Error("Annotation not found");
+exports.deleteAnnotation = async (annotationId) => {
+  if (!mongoose.isValidObjectId(annotationId)) {
+    const err = new Error("Invalid annotationId");
+    err.status = 400;
+    throw err;
+  }
 
-  planEvents.annotationUpdated(annotation.projectId, annotation);
-  return annotation;
+  const annotation = await Annotation.findByIdAndDelete(annotationId);
+  if (!annotation) {
+    const err = new Error("Annotation not found");
+    err.status = 404;
+    throw err;
+  }
+
+  planEvents.annotationDeleted(annotation.projectId, annotationId);
+  return { message: "Annotation deleted", annotationId };
 };
