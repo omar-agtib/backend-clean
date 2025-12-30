@@ -13,11 +13,8 @@ export function getSocket(): Socket {
   if (socket) return socket;
 
   socket = io(getWsUrl(), {
-    transports: ["websocket", "polling"], // ✅ allow fallback
+    transports: ["websocket"],
     autoConnect: true,
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 300,
     auth: {
       token: token.get() ? `Bearer ${token.get()}` : undefined,
     },
@@ -34,4 +31,14 @@ export function joinProjectRoom(projectId: string) {
 export function leaveProjectRoom(projectId: string) {
   const s = getSocket();
   s.emit("leave:project", projectId);
+}
+
+export function joinUserRoom(userId: string) {
+  const s = getSocket();
+  s.emit("join:user", userId);
+}
+
+export function leaveUserRoom(userId: string) {
+  const s = getSocket();
+  s.emit("leave:user", userId);
 }

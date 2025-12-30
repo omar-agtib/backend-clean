@@ -1,16 +1,16 @@
-// modules/notifications/notification.routes.js
+// backend/modules/notifications/notification.routes.js
 const router = require("express").Router();
 const auth = require("../../middlewares/auth");
 const ctrl = require("./notification.controller");
 
 /**
- * GET /api/notifications?unreadOnly=true
+ * @swagger
+ * tags:
+ *   name: Notifications
  */
-router.get("/", auth, ctrl.listMine);
 
-/**
- * POST /api/notifications/:id/read
- */
-router.post("/:id/read", auth, ctrl.markRead);
+router.get("/", auth, ctrl.listMine);
+router.patch("/:notificationId/read", auth, ctrl.markRead);
+router.post("/read-all", auth, ctrl.markAllRead);
 
 module.exports = router;

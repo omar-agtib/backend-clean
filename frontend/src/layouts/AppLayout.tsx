@@ -1,85 +1,89 @@
 // src/layouts/AppLayout.tsx
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import LogoMark from "../components/LogoMark";
-import ToastHost from "../components/ToastHost";
-import { token } from "../lib/token";
-import { useMe } from "../features/auth/hooks/useMe";
-import { useProjectStore } from "../store/projectStore";
+import { NavLink, Outlet } from "react-router-dom";
+import { useMemo } from "react";
+import { useNotifications } from "../features/notifications/hooks/useNotifications";
+import { useNotificationsRealtime } from "../features/notifications/hooks/useNotificationsRealtime";
+import { useAuthStore } from "../store/auth.store"; // if you don't have it, tell me + paste your auth store
 
-function Item({ to, label }: { to: string; label: string }) {
+function AppNavItem({
+  to,
+  label,
+  badge,
+}: {
+  to: string;
+  label: string;
+  badge?: number;
+}) {
   return (
     <NavLink
       to={to}
       className={({ isActive }) =>
         [
-          "px-3 py-2 rounded-xl text-sm font-medium transition",
+          "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition",
           isActive
             ? "bg-slate-900 text-white"
-            : "text-slate-700 hover:bg-slate-100",
+            : "bg-slate-100 hover:bg-slate-200 text-slate-900",
         ].join(" ")
       }
     >
-      {label}
+      <span>{label}</span>
+      {badge && badge > 0 ? (
+        <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-extrabold">
+          {badge}
+        </span>
+      ) : null}
     </NavLink>
   );
 }
 
 export default function AppLayout() {
-  const navigate = useNavigate();
-  const me = useMe();
+  // ✅ assuming you keep auth user in a zustand store
+  const user = useAuthStore((s) => s.user); // { _id, name, ... } typical
 
-  const activeProjectName = useProjectStore((s) => s.activeProjectName);
+  // realtime notifications
+  useNotificationsRealtime(user?._id || null);
 
-  function logout() {
-    token.clear();
-    navigate("/login", { replace: true });
-  }
+  // fetch notifications (for badge)
+  const q = useNotifications({ limit: 100 });
+
+  const unread = useMemo(() => {
+    const list = q.data || [];
+    return list.filter((x) => !x.isRead).length;
+  }, [q.data]);
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-10 bg-white border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <LogoMark className="h-9 w-9 text-slate-900" />
-            <div className="leading-tight">
-              <div className="font-bold text-slate-900">Chantier Platform</div>
-
-              <div className="text-xs text-slate-500">
-                {me.data?.email || "—"}
-                {activeProjectName ? (
-                  <>
-                    {" "}
-                    · <span className="font-medium">{activeProjectName}</span>
-                  </>
-                ) : null}
-              </div>
+      <div className="mx-auto max-w-7xl px-4 py-5 grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Sidebar */}
+        <aside className="lg:col-span-3 space-y-3">
+          <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
+            <div className="text-lg font-extrabold text-slate-900">
+              Chantier
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              {user?.name ? `Signed in as ${user.name}` : "Workspace"}
             </div>
           </div>
 
-          <nav className="flex items-center gap-2 flex-wrap justify-end">
-            <Item to="/app" label="Dashboard" />
-            <Item to="/app/projects" label="Projects" />
-            <Item to="/app/workspace" label="Workspace" />
-            <Item to="/app/stock" label="Stock" />
-            <Item to="/app/tools" label="Tools" />
-            <Item to="/app/billing" label="Billing" />
-
-            <button
-              onClick={logout}
-              className="ml-2 px-3 py-2 rounded-xl text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
-            >
-              Logout
-            </button>
+          <nav className="space-y-2">
+            <AppNavItem to="/app" label="Dashboard" />
+            <AppNavItem to="/app/projects" label="Projects" />
+            <AppNavItem
+              to="/app/notifications"
+              label="Notifications"
+              badge={unread}
+            />
+            <AppNavItem to="/app/stock" label="Stock" />
+            <AppNavItem to="/app/tools" label="Tools" />
+            <AppNavItem to="/app/billing" label="Billing" />
           </nav>
-        </div>
-      </header>
+        </aside>
 
-      <main className="max-w-6xl mx-auto px-4 py-6">
-        <Outlet />
-      </main>
-
-      {/* Global toasts */}
-      <ToastHost />
+        {/* Main */}
+        <main className="lg:col-span-9">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

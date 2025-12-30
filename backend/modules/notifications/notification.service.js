@@ -1,81 +1,101 @@
-// modules/notifications/notification.service.js
+// backend/modules/notifications/notification.service.js
+const mongoose = require("mongoose");
 const Notification = require("./notification.model");
-const { notifyUser } = require("../../ws/notification");
+const { getIO } = require("../../ws/io");
+const { userRoom } = require("../../ws/rooms");
 
-async function createAndEmit({
+function badRequest(message) {
+  const err = new Error(message);
+  err.status = 400;
+  return err;
+}
+
+exports.createAndEmit = async ({
   userId,
   projectId,
   type,
   title,
   message,
   data,
-}) {
-  if (!userId) {
-    const err = new Error("userId is required");
-    err.status = 400;
-    throw err;
-  }
-  if (!type) {
-    const err = new Error("type is required");
-    err.status = 400;
-    throw err;
-  }
-  if (!title) {
-    const err = new Error("title is required");
-    err.status = 400;
-    throw err;
-  }
+}) => {
+  if (!userId) throw badRequest("userId is required");
+  if (!type) throw badRequest("type is required");
+  if (!title) throw badRequest("title is required");
 
   const doc = await Notification.create({
     userId,
-    projectId: projectId || null,
+    projectId: projectId || undefined,
     type,
     title,
     message: message || "",
-    data: data || {},
+    data: data || undefined,
+    isRead: false,
   });
 
-  // WS emit
-  notifyUser(String(userId), {
-    _id: doc._id,
-    userId: doc.userId,
-    projectId: doc.projectId,
-    type: doc.type,
-    title: doc.title,
-    message: doc.message,
-    data: doc.data,
-    readAt: doc.readAt,
-    createdAt: doc.createdAt,
-  });
+  // ✅ emit to user room
+  try {
+    const io = getIO();
+    io.to(userRoom(String(userId))).emit("notification:new", doc);
+  } catch {
+    // ignore if WS not ready
+  }
 
   return doc;
-}
+};
 
-async function listMine(userId, { unreadOnly = false } = {}) {
-  const q = { userId };
-  if (unreadOnly) q.readAt = null;
+exports.listMine = async (userId, filters = {}) => {
+  if (!userId) throw badRequest("userId is required");
 
-  return Notification.find(q).sort({ createdAt: -1 }).limit(100);
-}
+  const q = {
+    userId: new mongoose.Types.ObjectId(String(userId)),
+  };
 
-async function markRead(userId, notificationId) {
-  const doc = await Notification.findOneAndUpdate(
+  if (filters.projectId) {
+    if (!mongoose.isValidObjectId(filters.projectId))
+      throw badRequest("Invalid projectId");
+    q.projectId = new mongoose.Types.ObjectId(String(filters.projectId));
+  }
+
+  if (filters.unreadOnly) q.isRead = false;
+
+  const limit = Math.min(Number(filters.limit || 50), 200);
+
+  return Notification.find(q).sort({ createdAt: -1 }).limit(limit);
+};
+
+exports.markRead = async (userId, notificationId) => {
+  if (!mongoose.isValidObjectId(notificationId))
+    throw badRequest("Invalid notificationId");
+
+  const updated = await Notification.findOneAndUpdate(
     { _id: notificationId, userId },
-    { readAt: new Date() },
+    { $set: { isRead: true } },
     { new: true }
   );
 
-  if (!doc) {
+  if (!updated) {
     const err = new Error("Notification not found");
     err.status = 404;
     throw err;
   }
 
-  return doc;
-}
+  return updated;
+};
 
-module.exports = {
-  createAndEmit,
-  listMine,
-  markRead,
+exports.markAllRead = async (userId, projectId) => {
+  if (!userId) throw badRequest("userId is required");
+
+  const q = { userId, isRead: false };
+  if (projectId) {
+    if (!mongoose.isValidObjectId(projectId))
+      throw badRequest("Invalid projectId");
+    q.projectId = projectId;
+  }
+
+  const r = await Notification.updateMany(q, { $set: { isRead: true } });
+
+  return {
+    message: "All notifications marked as read",
+    modified: r.modifiedCount,
+  };
 };
