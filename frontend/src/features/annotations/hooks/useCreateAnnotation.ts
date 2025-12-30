@@ -1,20 +1,24 @@
 // src/features/annotations/hooks/useCreateAnnotation.ts
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  createAnnotationApi,
+  createAnnotation,
   type CreateAnnotationDto,
 } from "../api/annotations.api";
 import { annotationKeys } from "../api/annotationKeys";
 
-export function useCreateAnnotation() {
+export function useCreateAnnotation(planVersionId?: string | null) {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: (dto: CreateAnnotationDto) => createAnnotationApi(dto),
-    onSuccess: async (_res, vars) => {
-      await qc.invalidateQueries({
-        queryKey: annotationKeys.version(vars.planVersionId),
-      });
+    mutationFn: (dto: CreateAnnotationDto) => createAnnotation(dto),
+    onSuccess: async () => {
+      if (planVersionId) {
+        await qc.invalidateQueries({
+          queryKey: annotationKeys.version(planVersionId),
+        });
+      } else {
+        await qc.invalidateQueries({ queryKey: annotationKeys.all });
+      }
     },
   });
 }

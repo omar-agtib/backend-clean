@@ -1,26 +1,29 @@
 // src/features/annotations/hooks/useAnnotationsRealtime.ts
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getSocket, joinProjectRoom } from "../../../lib/ws";
 import { annotationKeys } from "../api/annotationKeys";
+import { getSocket, joinProjectRoom } from "../../../lib/ws";
 import { useToastStore } from "../../../store/toast.store";
 
-export function useAnnotationsRealtime(planVersionId?: string | null) {
+export function useAnnotationsRealtime(
+  projectId?: string | null,
+  planVersionId?: string | null
+) {
   const qc = useQueryClient();
   const push = useToastStore((s) => s.push);
 
   useEffect(() => {
-    if (!planVersionId) return;
+    if (!projectId || !planVersionId) return;
 
     const s = getSocket();
+    joinProjectRoom(projectId);
 
-    // If your ws requires joining project room, you can still call it.
-    // But we only have planVersionId here; it’s ok to skip join.
-    // If you have projectId available, call joinProjectRoom(projectId).
+    const invalidate = () =>
+      qc.invalidateQueries({ queryKey: annotationKeys.version(planVersionId) });
 
     const onAdded = (a: any) => {
       if (String(a?.planVersionId) !== String(planVersionId)) return;
-      qc.invalidateQueries({ queryKey: annotationKeys.version(planVersionId) });
+      invalidate();
       push({
         kind: "success",
         title: "New pin added",
@@ -30,13 +33,18 @@ export function useAnnotationsRealtime(planVersionId?: string | null) {
 
     const onUpdated = (a: any) => {
       if (String(a?.planVersionId) !== String(planVersionId)) return;
-      qc.invalidateQueries({ queryKey: annotationKeys.version(planVersionId) });
-      push({ kind: "info", title: "Pin updated" });
+      invalidate();
+      push({
+        kind: "info",
+        title: "Pin updated",
+        message: a?.content || undefined,
+      });
     };
 
-    const onDeleted = (p: any) => {
-      // deleted payload is { annotationId }
-      qc.invalidateQueries({ queryKey: annotationKeys.version(planVersionId) });
+    const onDeleted = (payload: any) => {
+      // backend sends: { annotationId }
+      // We can't know planVersionId from this event, so just refresh current version.
+      invalidate();
       push({ kind: "info", title: "Pin deleted" });
     };
 
@@ -49,5 +57,5 @@ export function useAnnotationsRealtime(planVersionId?: string | null) {
       s.off("annotation:updated", onUpdated);
       s.off("annotation:deleted", onDeleted);
     };
-  }, [planVersionId, qc, push]);
+  }, [projectId, planVersionId, qc, push]);
 }

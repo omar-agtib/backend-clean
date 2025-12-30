@@ -1,4 +1,4 @@
-// ws/index.js
+// backend/ws/index.js
 const { Server } = require("socket.io");
 const planEvents = require("./planEvents");
 const { setIO } = require("./io");
@@ -6,52 +6,61 @@ const { projectRoom, userRoom } = require("./rooms");
 
 function initWebSocket(server) {
   const io = new Server(server, {
-    cors: { origin: "*" },
+    cors: {
+      origin: ["http://localhost:5173"], // keep strict for dev
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    },
+    pingTimeout: 30000,
+    pingInterval: 25000,
   });
 
   setIO(io);
 
   io.on("connection", (socket) => {
-    console.log("🟢 WS connected:", socket.id);
+    console.log(
+      "🟢 WS connected:",
+      socket.id,
+      "transport=",
+      socket.conn.transport.name
+    );
 
-    /**
-     * Join a project room
-     * Front sends: socket.emit("join:project", projectId)
-     */
+    // ✅ LOG EVERY EVENT FROM CLIENT (super important)
+    socket.onAny((event, ...args) => {
+      console.log("📩 WS event:", event, "from", socket.id, "args=", args);
+    });
+
     socket.on("join:project", (projectId) => {
       if (!projectId) return;
-      socket.join(projectRoom(projectId));
+      const room = projectRoom(projectId);
+      socket.join(room);
+      console.log(`🟣 ${socket.id} joined ${room}`);
+      console.log("   rooms now:", [...socket.rooms]);
     });
 
-    /**
-     * Join a user room (for personal notifications)
-     * Front sends: socket.emit("join:user", userId)
-     * (Later you can secure it by verifying JWT)
-     */
     socket.on("join:user", (userId) => {
       if (!userId) return;
-      socket.join(userRoom(userId));
+      const room = userRoom(userId);
+      socket.join(room);
+      console.log(`🔵 ${socket.id} joined ${room}`);
     });
 
-    /**
-     * Optional: leave rooms
-     */
     socket.on("leave:project", (projectId) => {
       if (!projectId) return;
-      socket.leave(projectRoom(projectId));
+      const room = projectRoom(projectId);
+      socket.leave(room);
+      console.log(`🟡 ${socket.id} left ${room}`);
     });
 
-    socket.on("leave:user", (userId) => {
-      if (!userId) return;
-      socket.leave(userRoom(userId));
+    socket.on("disconnect", (reason) => {
+      console.log("🔴 WS disconnected:", socket.id, "reason=", reason);
     });
 
-    // Register domain socket handlers (optional)
+    socket.on("connect_error", (err) => {
+      console.log("🔥 WS connect_error:", socket.id, err?.message);
+    });
+
     planEvents.registerSocketHandlers(io, socket);
-
-    socket.on("disconnect", () => {
-      console.log("🔴 WS disconnected:", socket.id);
-    });
   });
 
   console.log("✅ WebSocket initialized");

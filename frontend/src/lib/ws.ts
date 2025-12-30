@@ -5,8 +5,6 @@ import { token } from "./token";
 let socket: Socket | null = null;
 
 function getWsUrl() {
-  // If you want, add VITE_WS_URL, else derive from API
-  // API: http://localhost:3001/api -> WS: http://localhost:3001
   const api = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
   return api.replace(/\/api\/?$/, "");
 }
@@ -15,8 +13,11 @@ export function getSocket(): Socket {
   if (socket) return socket;
 
   socket = io(getWsUrl(), {
-    transports: ["websocket"],
+    transports: ["websocket", "polling"], // ✅ allow fallback
     autoConnect: true,
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 300,
     auth: {
       token: token.get() ? `Bearer ${token.get()}` : undefined,
     },
@@ -32,5 +33,5 @@ export function joinProjectRoom(projectId: string) {
 
 export function leaveProjectRoom(projectId: string) {
   const s = getSocket();
-  s.emit("leave:project", projectId); // optional (server may ignore)
+  s.emit("leave:project", projectId);
 }

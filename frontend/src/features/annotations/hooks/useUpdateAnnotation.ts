@@ -1,18 +1,31 @@
 // src/features/annotations/hooks/useUpdateAnnotation.ts
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { updateAnnotationApi } from "../api/annotations.api";
+import { updateAnnotation } from "../api/annotations.api";
 import { annotationKeys } from "../api/annotationKeys";
 
-export function useUpdateAnnotation(planVersionId: string) {
+export function useUpdateAnnotation(planVersionId?: string | null) {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: (p: { annotationId: string; patch: any }) =>
-      updateAnnotationApi(p.annotationId, p.patch),
+    mutationFn: (p: {
+      annotationId: string;
+      geometry?: { x: number; y: number; page?: number };
+      content?: string;
+      type?: "DRAW" | "PIN" | "TEXT";
+    }) =>
+      updateAnnotation(p.annotationId, {
+        geometry: p.geometry,
+        content: p.content,
+        type: p.type,
+      }),
     onSuccess: async () => {
-      await qc.invalidateQueries({
-        queryKey: annotationKeys.version(planVersionId),
-      });
+      if (planVersionId) {
+        await qc.invalidateQueries({
+          queryKey: annotationKeys.version(planVersionId),
+        });
+      } else {
+        await qc.invalidateQueries({ queryKey: annotationKeys.all });
+      }
     },
   });
 }

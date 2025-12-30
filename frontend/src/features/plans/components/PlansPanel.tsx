@@ -6,6 +6,11 @@ import PlanPreview from "./PlanPreview";
 
 import { usePlans } from "../hooks/usePlans";
 import { usePlanVersions } from "../hooks/usePlanVersions";
+import { useCreatePlan } from "../hooks/useCreatePlan";
+import { useUploadPlanVersion } from "../hooks/useUploadPlanVersion";
+
+import type { Plan } from "../api/plans.api";
+import CreatePlanModal from "./CreatePlanModal";
 
 export default function PlansPanel({ projectId }: { projectId: string }) {
   const plansQ = usePlans(projectId);
@@ -15,13 +20,16 @@ export default function PlansPanel({ projectId }: { projectId: string }) {
 
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
 
+  const createPlan = useCreatePlan(projectId);
+  const upload = useUploadPlanVersion(projectId);
+
+  const [createOpen, setCreateOpen] = useState(false);
+
   const plans = plansQ.data || [];
   const versions = versionsQ.data || [];
 
   useEffect(() => {
-    if (!activePlanId && plans.length > 0) {
-      setActivePlanId(plans[0]._id);
-    }
+    if (!activePlanId && plans.length > 0) setActivePlanId(plans[0]._id);
   }, [plans, activePlanId]);
 
   useEffect(() => {
@@ -40,9 +48,28 @@ export default function PlansPanel({ projectId }: { projectId: string }) {
     [versions, activeVersionId]
   );
 
-  if (plansQ.isLoading) {
-    return <div className="h-40 bg-slate-200 animate-pulse rounded-2xl" />;
+  async function onCreatePlan(dto: {
+    projectId: string;
+    name: string;
+    description?: string;
+  }) {
+    await createPlan.mutateAsync({
+      projectId: dto.projectId,
+      name: dto.name,
+      description: dto.description,
+    });
+    setCreateOpen(false);
   }
+
+  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !activePlanId) return;
+    await upload.mutateAsync({ planId: activePlanId, file });
+    e.target.value = "";
+  }
+
+  if (plansQ.isLoading)
+    return <div className="h-40 bg-slate-200 animate-pulse rounded-2xl" />;
 
   if (plansQ.isError) {
     return (
@@ -56,47 +83,86 @@ export default function PlansPanel({ projectId }: { projectId: string }) {
     );
   }
 
-  if (!plans.length) {
-    return (
-      <SectionCard title="Plans">
-        <div className="text-sm text-slate-600">No plans yet.</div>
-      </SectionCard>
-    );
-  }
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
       <div className="lg:col-span-2 space-y-4">
         <SectionCard title="Plans">
-          <div className="space-y-2">
-            {plans.map((p) => (
-              <button
-                key={p._id}
-                onClick={() => {
-                  setActivePlanId(p._id);
-                  setActiveVersionId(null);
-                }}
-                className={[
-                  "w-full text-left rounded-xl border px-4 py-3 transition",
-                  p._id === activePlanId
-                    ? "border-slate-900 bg-slate-50"
-                    : "border-slate-200 hover:bg-slate-50",
-                ].join(" ")}
-              >
-                <div className="font-semibold text-slate-900">
-                  {p.name || p.title}
-                </div>
-                {p.description ? (
-                  <div className="text-xs text-slate-500 mt-1 line-clamp-2">
-                    {p.description}
-                  </div>
-                ) : null}
-              </button>
-            ))}
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs text-slate-500">{plans.length} plans</div>
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="rounded-xl bg-slate-900 hover:bg-slate-800 px-3 py-2 text-xs font-semibold text-white"
+              type="button"
+            >
+              + New Plan
+            </button>
           </div>
+
+          {plans.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+              <div className="text-sm font-semibold text-slate-900">
+                No plans yet
+              </div>
+              <div className="mt-1 text-xs text-slate-600">
+                Click <span className="font-semibold">+ New Plan</span> to
+                create your first plan.
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {plans.map((p: Plan) => (
+                <button
+                  key={p._id}
+                  onClick={() => {
+                    setActivePlanId(p._id);
+                    setActiveVersionId(null);
+                  }}
+                  className={[
+                    "w-full text-left rounded-xl border px-4 py-3 transition",
+                    p._id === activePlanId
+                      ? "border-slate-900 bg-slate-50"
+                      : "border-slate-200 hover:bg-slate-50",
+                  ].join(" ")}
+                  type="button"
+                >
+                  <div className="font-semibold text-slate-900">
+                    {(p as any).name}
+                  </div>
+                  {(p as any).description ? (
+                    <div className="text-xs text-slate-500 mt-1 line-clamp-2">
+                      {(p as any).description}
+                    </div>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          )}
         </SectionCard>
 
         <SectionCard title="Versions">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs text-slate-500">
+              {activePlanId ? "Upload a new version file" : "Select a plan"}
+            </div>
+
+            <label className="cursor-pointer rounded-xl bg-slate-900 hover:bg-slate-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60">
+              {upload.isPending ? "Uploading..." : "+ Upload"}
+              <input
+                type="file"
+                className="hidden"
+                onChange={onPickFile}
+                disabled={upload.isPending || !activePlanId}
+              />
+            </label>
+          </div>
+
+          {upload.isError ? (
+            <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700 mb-3">
+              {(upload.error as any)?.response?.data?.message ||
+                (upload.error as Error).message}
+            </div>
+          ) : null}
+
           {versionsQ.isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -112,7 +178,9 @@ export default function PlansPanel({ projectId }: { projectId: string }) {
                 (versionsQ.error as Error).message}
             </div>
           ) : versions.length === 0 ? (
-            <div className="text-sm text-slate-600">No versions yet.</div>
+            <div className="text-sm text-slate-600">
+              No versions yet. Upload the first PDF.
+            </div>
           ) : (
             <div className="space-y-2">
               {[...versions]
@@ -127,6 +195,7 @@ export default function PlansPanel({ projectId }: { projectId: string }) {
                         ? "border-slate-900 bg-slate-50"
                         : "border-slate-200 hover:bg-slate-50",
                     ].join(" ")}
+                    type="button"
                   >
                     <div className="font-medium text-slate-900">
                       Version #{v.versionNumber}
@@ -145,8 +214,24 @@ export default function PlansPanel({ projectId }: { projectId: string }) {
         <PlanPreview
           file={previewVersion?.file || null}
           planVersionId={previewVersion?._id || null}
+          projectId={projectId} // ✅ for realtime join room
         />
       </div>
+
+      {createOpen && (
+        <CreatePlanModal
+          projectId={projectId}
+          onClose={() => setCreateOpen(false)}
+          onCreate={onCreatePlan}
+          isPending={createPlan.isPending}
+          errorMessage={
+            createPlan.isError
+              ? (createPlan.error as any)?.response?.data?.message ||
+                (createPlan.error as Error).message
+              : null
+          }
+        />
+      )}
     </div>
   );
 }

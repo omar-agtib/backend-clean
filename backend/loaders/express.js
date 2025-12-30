@@ -1,4 +1,4 @@
-//backend/loaders/express.js
+// backend/loaders/express.js
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
@@ -11,27 +11,28 @@ const audit = require("../middlewares/audit");
 const logger = require("../config/logger");
 
 module.exports = (app) => {
-  // ✅ Swagger BEFORE helmet
   require("./swagger")(app);
 
-  // ✅ Security middlewares
   app.use(helmet(security.helmet));
-  app.use(cors(security.cors));
 
-  // ✅ Body parsers
+  const corsMiddleware = cors(security.cors);
+  app.use(corsMiddleware);
+
+  // Handle preflight without wildcard routes
+  app.use((req, res, next) => {
+    if (req.method === "OPTIONS") {
+      return corsMiddleware(req, res, () => res.sendStatus(204));
+    }
+    return next();
+  });
+
   app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ extended: true }));
-
-  // ✅ Cookie parser
   app.use(cookieParser());
-
-  // ✅ Rate limit
   app.use(rateLimit);
 
-  // ✅ Health router (single source of truth)
   app.use("/api/health", require("../modules/health/health.routes"));
 
-  // ✅ Audit (best effort: never block requests)
   app.use((req, res, next) => {
     try {
       return audit("GLOBAL_REQUEST")(req, res, next);
@@ -41,7 +42,6 @@ module.exports = (app) => {
     }
   });
 
-  // Routes
   app.use("/api/auth", require("../modules/auth/auth.routes"));
   app.use("/api/projects", require("../modules/projects/project.routes"));
   app.use("/api/plans", require("../modules/plans/plan.routes"));
@@ -59,11 +59,9 @@ module.exports = (app) => {
     require("../modules/notifications/notification.routes")
   );
 
-  // ✅ 404 handler
   app.use((req, res) => {
     res.status(404).json({ message: "Route not found" });
   });
 
-  // Error handler (last)
   app.use(errorHandler);
 };

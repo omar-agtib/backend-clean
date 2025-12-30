@@ -1,15 +1,17 @@
 // src/features/plans/components/PlanPreview.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SectionCard from "../../../components/SectionCard";
 import { Document, Page, pdfjs } from "react-pdf";
 
-import type { Annotation } from "../../annotations/api/annotations.api";
 import { useAnnotationsByVersion } from "../../annotations/hooks/useAnnotationsByVersion";
 import { useCreateAnnotation } from "../../annotations/hooks/useCreateAnnotation";
 import { useUpdateAnnotation } from "../../annotations/hooks/useUpdateAnnotation";
 import { useDeleteAnnotation } from "../../annotations/hooks/useDeleteAnnotation";
 import { useAnnotationsRealtime } from "../../annotations/hooks/useAnnotationsRealtime";
 
+import { useProjectStore } from "../../../store/projectStore";
+
+import type { Annotation } from "../../annotations/api/annotations.api";
 import AnnotationPinsOverlay from "../../annotations/components/AnnotationPinsOverlay";
 import AnnotationDrawer from "../../annotations/components/AnnotationDrawer";
 
@@ -28,160 +30,150 @@ export default function PlanPreview({
   planVersionId,
 }: {
   file: FileInfo | null;
-  planVersionId: string | null;
+  planVersionId?: string | null;
 }) {
   const [numPages, setNumPages] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
   const [error, setError] = useState<string | null>(null);
 
-  // page render size (for pins)
-  const pageWrapRef = useRef<HTMLDivElement | null>(null);
-  const [pageSize, setPageSize] = useState<{ w: number; h: number }>({
-    w: 0,
-    h: 0,
-  });
+  // Create mode
+  const [pinMode, setPinMode] = useState(false);
 
-  // drawer
+  // Drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Annotation | null>(null);
 
+  // ✅ rect tracking (fix for invisible pins)
+  const pageWrapElRef = useRef<HTMLDivElement | null>(null);
+  const resizeObsRef = useRef<ResizeObserver | null>(null);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
   const url = file?.url || null;
 
-  const annQ = useAnnotationsByVersion(planVersionId);
-  const createAnn = useCreateAnnotation();
-  const updateAnn = useUpdateAnnotation(planVersionId || "");
-  const deleteAnn = useDeleteAnnotation(planVersionId || "");
+  // projectId for realtime join
+  const projectId = useProjectStore((s) => s.activeProjectId);
 
-  // ✅ realtime toast + refresh
-  useAnnotationsRealtime(planVersionId);
+  // Queries + mutations
+  const q = useAnnotationsByVersion(planVersionId);
+  const create = useCreateAnnotation(planVersionId);
+  const update = useUpdateAnnotation(planVersionId);
+  const del = useDeleteAnnotation(planVersionId);
 
-  // reset when file changes
+  // ✅ realtime
+  useAnnotationsRealtime(projectId, planVersionId);
+
+  const annotations = q.data || [];
+
+  // Reset viewer when file changes
   useEffect(() => {
     setNumPages(0);
     setPage(1);
     setError(null);
-    setSelected(null);
+    setPinMode(false);
     setDrawerOpen(false);
+    setSelected(null);
   }, [url]);
 
-  // measure page area
-  useEffect(() => {
-    function measure() {
-      const el = pageWrapRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      setPageSize({ w: r.width, h: r.height });
+  // ✅ callback ref: always measure when element mounts
+  const setPageWrapRef = useCallback((node: HTMLDivElement | null) => {
+    // cleanup old observer
+    if (resizeObsRef.current) {
+      resizeObsRef.current.disconnect();
+      resizeObsRef.current = null;
     }
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+
+    pageWrapElRef.current = node;
+
+    if (!node) {
+      setRect(null);
+      return;
+    }
+
+    const updateRect = () => {
+      setRect(node.getBoundingClientRect());
+    };
+
+    // measure now + after paint (PDF renders async)
+    updateRect();
+    requestAnimationFrame(updateRect);
+
+    // observe size changes
+    const ro = new ResizeObserver(() => updateRect());
+    ro.observe(node);
+    resizeObsRef.current = ro;
   }, []);
 
-  function onPageRenderSuccess() {
-    const el = pageWrapRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    setPageSize({ w: r.width, h: r.height });
-  }
+  // ✅ keep rect fresh on scroll/resize + when page changes
+  useEffect(() => {
+    const updateRect = () => {
+      const el = pageWrapElRef.current;
+      if (!el) return;
+      setRect(el.getBoundingClientRect());
+    };
+
+    updateRect();
+    requestAnimationFrame(updateRect);
+
+    window.addEventListener("scroll", updateRect, true);
+    window.addEventListener("resize", updateRect);
+
+    return () => {
+      window.removeEventListener("scroll", updateRect, true);
+      window.removeEventListener("resize", updateRect);
+    };
+  }, [page, url]);
 
   const title = useMemo(() => {
     if (!file) return "Preview";
     return file.originalName || file.publicId || "Preview";
   }, [file]);
 
-  const annotations = useMemo(() => {
-    const list = annQ.data || [];
-    return list.filter((a) => a.type === "PIN");
-  }, [annQ.data]);
-
-  function openAnnotation(a: Annotation) {
-    setSelected(a);
-    setDrawerOpen(true);
-  }
-
-  // Shift+click create pin
-  async function onPdfClickToCreatePin(e: React.MouseEvent) {
+  async function placePin(e: React.MouseEvent) {
+    if (!pinMode) return;
     if (!planVersionId) return;
-    if (!e.shiftKey) return;
 
-    const el = pageWrapRef.current;
+    const el = pageWrapElRef.current;
     if (!el) return;
 
     const r = el.getBoundingClientRect();
-    const xPct = (e.clientX - r.left) / r.width;
-    const yPct = (e.clientY - r.top) / r.height;
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
 
-    const x = clamp(xPct);
-    const y = clamp(yPct);
+    const nx = Math.max(0, Math.min(1, x));
+    const ny = Math.max(0, Math.min(1, y));
 
-    await createAnn.mutateAsync({
+    await create.mutateAsync({
       planVersionId,
       type: "PIN",
-      geometry: { xPct: x, yPct: y, page },
-      content: "New pin",
+      geometry: { x: nx, y: ny, page },
+      content: "",
     });
+
+    setPinMode(false);
   }
 
-  async function onPinRightClick(a: Annotation) {
-    const ok = window.confirm("Delete this pin?");
-    if (!ok) return;
-
-    await deleteAnn.mutateAsync(a._id);
-
-    if (selected?._id === a._id) {
-      setDrawerOpen(false);
-      setSelected(null);
-    }
-  }
-
-  async function onPinDragEnd(
-    a: Annotation,
-    next: { xPct: number; yPct: number }
-  ) {
-    const prev = a.geometry || {};
-    await updateAnn.mutateAsync({
+  async function onDragEnd(a: Annotation, nx: number, ny: number) {
+    await update.mutateAsync({
       annotationId: a._id,
-      patch: {
-        geometry: {
-          ...prev,
-          xPct: next.xPct,
-          yPct: next.yPct,
-          page: prev.page ?? page,
-        },
-      },
+      geometry: { ...a.geometry, x: nx, y: ny, page },
     });
+  }
 
-    // keep drawer in sync
+  async function onDelete(a: Annotation) {
+    await del.mutateAsync(a._id);
     if (selected?._id === a._id) {
-      setSelected({
-        ...a,
-        geometry: {
-          ...prev,
-          xPct: next.xPct,
-          yPct: next.yPct,
-          page: prev.page ?? page,
-        },
-      } as any);
+      setSelected(null);
+      setDrawerOpen(false);
     }
   }
 
-  async function saveDrawerContent(nextContent: string) {
+  async function onSave(content: string) {
     if (!selected) return;
-    await updateAnn.mutateAsync({
+    await update.mutateAsync({
       annotationId: selected._id,
-      patch: { content: nextContent },
+      content,
     });
-    setSelected({ ...selected, content: nextContent });
-  }
-
-  async function deleteFromDrawer() {
-    if (!selected) return;
-    const ok = window.confirm("Delete this annotation?");
-    if (!ok) return;
-
-    await deleteAnn.mutateAsync(selected._id);
     setDrawerOpen(false);
-    setSelected(null);
   }
 
   if (!file) {
@@ -199,53 +191,76 @@ export default function PlanPreview({
     );
   }
 
+  const tip =
+    "Tip: Right click pin to delete · Hold Shift and drag pin to move";
+
   return (
     <SectionCard title={title}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-sm text-slate-600">
-          {numPages ? (
-            <>
-              Page <span className="font-semibold text-slate-900">{page}</span>{" "}
-              / <span className="font-semibold text-slate-900">{numPages}</span>
-              <span className="ml-2 text-slate-400">
-                (Shift+Click to drop a pin)
-              </span>
-            </>
-          ) : (
-            "Loading document..."
-          )}
+      {/* Top actions */}
+      <div className="mb-3 space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm text-slate-600">
+            {numPages ? (
+              <>
+                Page{" "}
+                <span className="font-semibold text-slate-900">{page}</span> /{" "}
+                <span className="font-semibold text-slate-900">{numPages}</span>
+                {pinMode ? (
+                  <span className="ml-3 inline-flex items-center rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
+                    Click on PDF to place pin
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              "Loading document..."
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold hover:bg-slate-200 disabled:opacity-50"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={!numPages || page <= 1}
+              type="button"
+            >
+              Prev
+            </button>
+
+            <button
+              className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold hover:bg-slate-200 disabled:opacity-50"
+              onClick={() => setPage((p) => Math.min(numPages, p + 1))}
+              disabled={!numPages || page >= numPages}
+              type="button"
+            >
+              Next
+            </button>
+
+            <button
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+              type="button"
+              disabled={!planVersionId || create.isPending}
+              onClick={() => setPinMode((v) => !v)}
+              title={!planVersionId ? "Select a version first" : "Add pin"}
+            >
+              {pinMode ? "Cancel Pin" : "+ Pin"}
+            </button>
+
+            <a
+              href={file.url}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white"
+            >
+              Open PDF
+            </a>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold hover:bg-slate-200 disabled:opacity-50"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={!numPages || page <= 1}
-            type="button"
-          >
-            Prev
-          </button>
-
-          <button
-            className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold hover:bg-slate-200 disabled:opacity-50"
-            onClick={() => setPage((p) => Math.min(numPages, p + 1))}
-            disabled={!numPages || page >= numPages}
-            type="button"
-          >
-            Next
-          </button>
-
-          <a
-            href={file.url}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white"
-          >
-            Open PDF
-          </a>
-        </div>
+        {/* Tip shown at top */}
+        <div className="text-xs text-slate-500">{tip}</div>
       </div>
 
+      {/* Viewer area */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         {error ? (
           <div className="p-6 text-sm text-red-700">
@@ -264,80 +279,74 @@ export default function PlanPreview({
         ) : (
           <div className="max-h-[75vh] overflow-auto p-3">
             <div
-              className="relative inline-block"
-              onClick={onPdfClickToCreatePin}
+              ref={setPageWrapRef}
+              className={[
+                "relative inline-block",
+                pinMode ? "cursor-crosshair" : "cursor-default",
+              ].join(" ")}
+              onClick={placePin}
             >
-              <div ref={pageWrapRef} className="relative">
-                <Document
-                  file={file.url}
-                  onLoadSuccess={(r) => {
-                    setNumPages(r.numPages);
-                    setPage(1);
-                  }}
-                  onLoadError={(e: any) =>
-                    setError(e?.message || "Unknown error")
-                  }
-                  loading={
-                    <div className="h-80 animate-pulse rounded-2xl bg-slate-200" />
-                  }
-                >
-                  <Page
-                    pageNumber={page}
-                    renderAnnotationLayer={false}
-                    renderTextLayer={false}
-                    onRenderSuccess={onPageRenderSuccess}
-                  />
-                </Document>
+              <Document
+                file={file.url}
+                onLoadSuccess={(r) => {
+                  setNumPages(r.numPages);
+                  setPage(1);
+                  // measure after doc load
+                  requestAnimationFrame(() => {
+                    const el = pageWrapElRef.current;
+                    if (el) setRect(el.getBoundingClientRect());
+                  });
+                }}
+                onLoadError={(e: any) =>
+                  setError(e?.message || "Unknown error")
+                }
+                loading={
+                  <div className="h-80 animate-pulse rounded-2xl bg-slate-200" />
+                }
+              >
+                <Page
+                  pageNumber={page}
+                  renderAnnotationLayer={false}
+                  renderTextLayer={false}
+                />
+              </Document>
 
-                {planVersionId && pageSize.w > 0 && pageSize.h > 0 ? (
-                  <AnnotationPinsOverlay
-                    pageWidth={pageSize.w}
-                    pageHeight={pageSize.h}
-                    annotations={annotations.filter((a) => {
-                      const pg = (a.geometry as any)?.page;
-                      return pg ? Number(pg) === page : true;
-                    })}
-                    onPinClick={openAnnotation}
-                    onPinRightClick={onPinRightClick}
-                    onPinDragEnd={onPinDragEnd}
-                  />
-                ) : null}
-              </div>
+              {/* Pins overlay */}
+              <AnnotationPinsOverlay
+                annotations={annotations}
+                page={page}
+                containerRect={rect}
+                onSelect={(a) => {
+                  setSelected(a);
+                  setDrawerOpen(true);
+                }}
+                onDragEnd={onDragEnd}
+                onRightClickDelete={onDelete}
+              />
             </div>
-
-            {planVersionId && annQ.isError ? (
-              <div className="mt-3 text-sm text-red-700">
-                {(annQ.error as any)?.response?.data?.message ||
-                  (annQ.error as Error).message}
-              </div>
-            ) : null}
           </div>
         )}
       </div>
 
+      {/* Drawer */}
       <AnnotationDrawer
         open={drawerOpen}
         annotation={selected}
         onClose={() => setDrawerOpen(false)}
-        onSave={saveDrawerContent}
-        onDelete={deleteFromDrawer}
-        isSaving={updateAnn.isPending}
-        isDeleting={deleteAnn.isPending}
+        onSave={onSave}
+        onDelete={() => (selected ? onDelete(selected) : undefined)}
+        isSaving={update.isPending}
+        isDeleting={del.isPending}
         errorMessage={
-          (updateAnn.isError
-            ? (updateAnn.error as any)?.response?.data?.message ||
-              (updateAnn.error as Error).message
-            : null) ||
-          (deleteAnn.isError
-            ? (deleteAnn.error as any)?.response?.data?.message ||
-              (deleteAnn.error as Error).message
-            : null)
+          (update.isError &&
+            ((update.error as any)?.response?.data?.message ||
+              (update.error as Error).message)) ||
+          (del.isError &&
+            ((del.error as any)?.response?.data?.message ||
+              (del.error as Error).message)) ||
+          undefined
         }
       />
     </SectionCard>
   );
-}
-
-function clamp(v: number) {
-  return Math.min(1, Math.max(0, v));
 }

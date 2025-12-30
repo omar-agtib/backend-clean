@@ -7,18 +7,27 @@ export type Annotation = {
   _id: string;
   projectId: string;
   planVersionId: string;
+
   type: AnnotationType;
-  geometry: any; // we store { xPct, yPct, page } for pins (recommended)
-  content?: string | null;
+  geometry: {
+    x: number; // normalized 0..1
+    y: number; // normalized 0..1
+    page?: number;
+  };
+
+  content?: string;
+
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+
+  clientId?: string;
 };
 
 export type CreateAnnotationDto = {
   planVersionId: string;
   type: AnnotationType;
-  geometry: any;
+  geometry: { x: number; y: number; page?: number };
   content?: string;
   clientId?: string;
 };
@@ -30,13 +39,17 @@ export async function listAnnotationsByVersion(planVersionId: string) {
   return data;
 }
 
-export async function createAnnotationApi(dto: CreateAnnotationDto) {
+export async function createAnnotation(dto: CreateAnnotationDto) {
   const { data } = await http.post<Annotation>("/annotations", dto);
   return data;
 }
 
-// If your backend route differs, change it here:
-export async function updateAnnotationApi(annotationId: string, patch: any) {
+export async function updateAnnotation(
+  annotationId: string,
+  patch: Partial<Pick<Annotation, "geometry" | "content" | "type">> & {
+    geometry?: { x: number; y: number; page?: number };
+  }
+) {
   const { data } = await http.patch<Annotation>(
     `/annotations/${annotationId}`,
     patch
@@ -44,7 +57,7 @@ export async function updateAnnotationApi(annotationId: string, patch: any) {
   return data;
 }
 
-export async function deleteAnnotationApi(annotationId: string) {
+export async function deleteAnnotation(annotationId: string) {
   const { data } = await http.delete<{ message: string; annotationId: string }>(
     `/annotations/${annotationId}`
   );

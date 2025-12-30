@@ -1,17 +1,21 @@
 // src/features/annotations/hooks/useDeleteAnnotation.ts
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { deleteAnnotationApi } from "../api/annotations.api";
+import { deleteAnnotation } from "../api/annotations.api";
 import { annotationKeys } from "../api/annotationKeys";
 
-export function useDeleteAnnotation(planVersionId: string) {
+export function useDeleteAnnotation(planVersionId?: string | null) {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: (annotationId: string) => deleteAnnotationApi(annotationId),
+    mutationFn: (annotationId: string) => deleteAnnotation(annotationId),
     onSuccess: async () => {
-      await qc.invalidateQueries({
-        queryKey: annotationKeys.version(planVersionId),
-      });
+      if (planVersionId) {
+        await qc.invalidateQueries({
+          queryKey: annotationKeys.version(planVersionId),
+        });
+      } else {
+        await qc.invalidateQueries({ queryKey: annotationKeys.all });
+      }
     },
   });
 }

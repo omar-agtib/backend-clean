@@ -1,4 +1,4 @@
-// ws/rooms.js
+// backend/ws/rooms.js
 function projectRoom(projectId) {
   return `project:${projectId}`;
 }

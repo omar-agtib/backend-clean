@@ -1,162 +1,181 @@
 // src/features/annotations/components/AnnotationPinsOverlay.tsx
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation } from "../api/annotations.api";
 
+function clamp01(n: number) {
+  return Math.max(0, Math.min(1, n));
+}
+
 export default function AnnotationPinsOverlay({
-  pageWidth,
-  pageHeight,
   annotations,
-  onPinClick,
-  onPinRightClick,
-  onPinDragEnd,
+  page,
+  containerRect,
+  onSelect,
+  onDragEnd,
+  onRightClickDelete,
 }: {
-  pageWidth: number;
-  pageHeight: number;
   annotations: Annotation[];
-  onPinClick: (a: Annotation) => void;
-  onPinRightClick: (a: Annotation) => void;
-  onPinDragEnd: (a: Annotation, next: { xPct: number; yPct: number }) => void;
+  page: number;
+  containerRect: DOMRect | null;
+  onSelect: (a: Annotation) => void;
+  onDragEnd: (a: Annotation, nx: number, ny: number) => void;
+  onRightClickDelete: (a: Annotation) => void;
 }) {
+  // show only PINs on current page
+  const pins = useMemo(() => {
+    return (annotations || [])
+      .filter((a) => a?.type === "PIN")
+      .filter((a) => Number((a as any)?.geometry?.page || 1) === Number(page));
+  }, [annotations, page]);
+
+  const draggingRef = useRef<{
+    id: string;
+    startX: number;
+    startY: number;
+  } | null>(null);
+
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
+
+  // Convert pointer position -> normalized x/y inside containerRect
+  function pointerToNormalized(e: PointerEvent | React.PointerEvent) {
+    if (!containerRect) return null;
+
+    const px = (e as any).clientX as number;
+    const py = (e as any).clientY as number;
+
+    const x = (px - containerRect.left) / containerRect.width;
+    const y = (py - containerRect.top) / containerRect.height;
+
+    return { x: clamp01(x), y: clamp01(y) };
+  }
+
+  function onPinPointerDown(e: React.PointerEvent, a: Annotation) {
+    // SHIFT required to start dragging
+    if (!e.shiftKey) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const start = pointerToNormalized(e);
+    if (!start) return;
+
+    draggingRef.current = {
+      id: a._id,
+      startX: start.x,
+      startY: start.y,
+    };
+
+    setDraggingId(a._id);
+    setGhost({ x: start.x, y: start.y });
+
+    // capture pointer so we continue receiving moves
+    try {
+      (e.currentTarget as any).setPointerCapture?.(e.pointerId);
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    if (!draggingId) return;
+
+    const onMove = (e: PointerEvent) => {
+      const pos = pointerToNormalized(e);
+      if (!pos) return;
+      setGhost({ x: pos.x, y: pos.y });
+    };
+
+    const onUp = async (e: PointerEvent) => {
+      const drag = draggingRef.current;
+      draggingRef.current = null;
+
+      const pos = pointerToNormalized(e);
+
+      setDraggingId(null);
+
+      if (!drag || !pos) {
+        setGhost(null);
+        return;
+      }
+
+      const movedPin = pins.find((p) => p._id === drag.id);
+      setGhost(null);
+
+      if (!movedPin) return;
+
+      // only commit if changed meaningfully
+      const prevX = Number((movedPin as any)?.geometry?.x ?? 0);
+      const prevY = Number((movedPin as any)?.geometry?.y ?? 0);
+      const dx = Math.abs(prevX - pos.x);
+      const dy = Math.abs(prevY - pos.y);
+      if (dx < 0.002 && dy < 0.002) return;
+
+      await onDragEnd(movedPin, pos.x, pos.y);
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp, { passive: false });
+
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [draggingId, pins, containerRect, onDragEnd]);
+
+  if (!containerRect) return null;
+
   return (
     <div
       className="absolute inset-0"
-      style={{ width: pageWidth, height: pageHeight }}
-    >
-      {annotations.map((a) => (
-        <Pin
-          key={a._id}
-          a={a}
-          pageWidth={pageWidth}
-          pageHeight={pageHeight}
-          onClick={() => onPinClick(a)}
-          onRightClick={() => onPinRightClick(a)}
-          onDragEnd={(next) => onPinDragEnd(a, next)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function Pin({
-  a,
-  pageWidth,
-  pageHeight,
-  onClick,
-  onRightClick,
-  onDragEnd,
-}: {
-  a: Annotation;
-  pageWidth: number;
-  pageHeight: number;
-  onClick: () => void;
-  onRightClick: () => void;
-  onDragEnd: (next: { xPct: number; yPct: number }) => void;
-}) {
-  const geom = (a.geometry || {}) as any;
-  const xPct = typeof geom.xPct === "number" ? geom.xPct : 0.5;
-  const yPct = typeof geom.yPct === "number" ? geom.yPct : 0.5;
-
-  const [dragging, setDragging] = useState(false);
-  const startRef = useRef<{
-    x: number;
-    y: number;
-    xPct: number;
-    yPct: number;
-  } | null>(null);
-
-  const left = xPct * pageWidth;
-  const top = yPct * pageHeight;
-
-  function onMouseDown(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(true);
-    startRef.current = { x: e.clientX, y: e.clientY, xPct, yPct };
-
-    const onMove = (ev: MouseEvent) => {
-      if (!startRef.current) return;
-
-      const dx = ev.clientX - startRef.current.x;
-      const dy = ev.clientY - startRef.current.y;
-
-      const nextXPx = startRef.current.xPct * pageWidth + dx;
-      const nextYPx = startRef.current.yPct * pageHeight + dy;
-
-      const next = {
-        xPct: clamp(nextXPx / pageWidth),
-        yPct: clamp(nextYPx / pageHeight),
-      };
-
-      // live move effect via CSS transform (simple)
-      const el = document.getElementById(`pin-${a._id}`);
-      if (el) {
-        el.style.left = `${next.xPct * pageWidth}px`;
-        el.style.top = `${next.yPct * pageHeight}px`;
-      }
-    };
-
-    const onUp = (ev: MouseEvent) => {
-      setDragging(false);
-      const st = startRef.current;
-      startRef.current = null;
-
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-
-      if (!st) return;
-      const dx = ev.clientX - st.x;
-      const dy = ev.clientY - st.y;
-
-      // if moved enough => treat as drag
-      if (Math.abs(dx) + Math.abs(dy) > 3) {
-        const nextXPx = st.xPct * pageWidth + dx;
-        const nextYPx = st.yPct * pageHeight + dy;
-
-        onDragEnd({
-          xPct: clamp(nextXPx / pageWidth),
-          yPct: clamp(nextYPx / pageHeight),
-        });
-      }
-    };
-
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  }
-
-  return (
-    <div
-      id={`pin-${a._id}`}
-      className={["absolute", "select-none", "cursor-pointer", "group"].join(
-        " "
-      )}
-      style={{ left, top }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onRightClick();
+      style={{
+        // Allow pins interaction, but keep overlay lightweight
+        pointerEvents: "none",
       }}
     >
-      <div
-        onMouseDown={onMouseDown}
-        className={[
-          "w-4 h-4 rounded-full",
-          "bg-red-600",
-          "shadow",
-          "ring-2 ring-white",
-          dragging ? "scale-110" : "group-hover:scale-110",
-          "transition",
-          "-translate-x-1/2 -translate-y-1/2",
-        ].join(" ")}
-        title={a.content || "Pin"}
-      />
+      {pins.map((a) => {
+        const gx = Number((a as any)?.geometry?.x ?? 0);
+        const gy = Number((a as any)?.geometry?.y ?? 0);
+
+        const isDragging = draggingId === a._id;
+        const x = isDragging && ghost ? ghost.x : gx;
+        const y = isDragging && ghost ? ghost.y : gy;
+
+        // translate(-50%, -50%) to center the pin
+        return (
+          <button
+            key={a._id}
+            type="button"
+            title="Click to edit • Shift+drag to move • Right click to delete"
+            className={[
+              "absolute -translate-x-1/2 -translate-y-1/2",
+              "h-6 w-6 rounded-full",
+              "bg-slate-900 text-white text-xs font-extrabold",
+              "shadow-md hover:scale-105 transition",
+              isDragging ? "opacity-80" : "opacity-100",
+            ].join(" ")}
+            style={{
+              left: `${x * 100}%`,
+              top: `${y * 100}%`,
+              pointerEvents: "auto", // IMPORTANT: enable interactions
+              cursor: isDragging ? "grabbing" : "pointer",
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSelect(a);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRightClickDelete(a);
+            }}
+            onPointerDown={(e) => onPinPointerDown(e, a)}
+          >
+            •
+          </button>
+        );
+      })}
     </div>
   );
-}
-
-function clamp(v: number) {
-  return Math.min(1, Math.max(0, v));
 }

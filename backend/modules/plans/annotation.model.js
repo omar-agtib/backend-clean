@@ -1,3 +1,4 @@
+// backend/modules/plans/annotation.model.js
 const mongoose = require("mongoose");
 
 const AnnotationSchema = new mongoose.Schema(
