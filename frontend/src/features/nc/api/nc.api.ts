@@ -4,6 +4,13 @@ import { http } from "../../../lib/http";
 export type NcStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "VALIDATED";
 export type NcPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
+export type UserMini = {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+};
+
 export type Nc = {
   _id: string;
   projectId: string;
@@ -11,7 +18,9 @@ export type Nc = {
   description?: string;
   status: NcStatus;
   priority: NcPriority;
-  assignedTo?: string | null;
+
+  assignedTo?: UserMini | string | null; // ✅ now can be populated object
+
   createdAt: string;
   updatedAt: string;
 };

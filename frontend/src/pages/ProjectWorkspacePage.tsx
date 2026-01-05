@@ -7,6 +7,12 @@ import PlansPanel from "../features/plans/components/PlansPanel";
 import { useProjectStore } from "../store/projectStore";
 import NcPanel from "../features/nc/components/NcPanel";
 
+// ✅ Reuse the same pages used by sidebar routes
+import StockPage from "./StockPage";
+import ToolsPage from "./ToolsPage";
+import BillingPage from "./BillingPage";
+import ProgressPanel from "../features/progress/components/ProgressPanel";
+
 type TabKey = "plans" | "nc" | "progress" | "stock" | "tools" | "billing";
 
 function Tab({
@@ -40,18 +46,18 @@ export default function ProjectWorkspacePage() {
   const location = useLocation();
   const params = useParams();
 
-  // ✅ route param (source of truth)
+  // route param (source of truth)
   const routeProjectId = params.projectId;
 
-  // ✅ store (optional nice-to-have for showing name)
+  // store (nice-to-have)
   const storeProjectId = useProjectStore((s) => s.activeProjectId);
   const storeProjectName = useProjectStore((s) => s.activeProjectName);
 
-  // ✅ use route first, fallback to store
+  // use route first, fallback to store
   const projectId = routeProjectId || storeProjectId;
   const projectName = storeProjectName;
 
-  // ✅ tab from query string
+  // tab from query string
   const tab: TabKey = useMemo(() => {
     const p = new URLSearchParams(location.search);
     const t = (p.get("tab") || "plans") as TabKey;
@@ -86,7 +92,7 @@ export default function ProjectWorkspacePage() {
     );
   }
 
-  // ✅ IMPORTANT: tabs must stay inside /app/projects/:projectId
+  // tabs stay inside /app/projects/:projectId
   const base = `/app/projects/${projectId}`;
 
   return (
@@ -156,49 +162,12 @@ export default function ProjectWorkspacePage() {
 
       {activeTab === "nc" && <NcPanel projectId={projectId} />}
 
-      {activeTab === "progress" && (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-          <div className="font-semibold text-slate-900">
-            Progress (Coming next)
-          </div>
-          <div className="text-sm text-slate-600 mt-1">
-            Milestones list + update progress + project summary.
-          </div>
-        </div>
-      )}
+      {activeTab === "progress" && <ProgressPanel projectId={projectId} />}
 
-      {activeTab === "stock" && (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-          <div className="font-semibold text-slate-900">
-            Stock (Coming next)
-          </div>
-          <div className="text-sm text-slate-600 mt-1">
-            Products + stock items + movements + adjust IN/OUT.
-          </div>
-        </div>
-      )}
-
-      {activeTab === "tools" && (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-          <div className="font-semibold text-slate-900">
-            Tools (Coming next)
-          </div>
-          <div className="text-sm text-slate-600 mt-1">
-            Inventory + assignments + maintenance history.
-          </div>
-        </div>
-      )}
-
-      {activeTab === "billing" && (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-          <div className="font-semibold text-slate-900">
-            Billing (Coming next)
-          </div>
-          <div className="text-sm text-slate-600 mt-1">
-            Invoices list + create + pay + summary.
-          </div>
-        </div>
-      )}
+      {/* ✅ reuse the same real pages */}
+      {activeTab === "stock" && <StockPage />}
+      {activeTab === "tools" && <ToolsPage />}
+      {activeTab === "billing" && <BillingPage />}
     </div>
   );
 }

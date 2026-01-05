@@ -5,6 +5,13 @@ const projectAccess = require("../../middlewares/projectAccess");
 const ctrl = require("./dashboard.controller");
 
 /**
+ * ✅ NEW: Global dashboard for logged user
+ * GET /api/dashboard/overview
+ */
+router.get("/overview", auth, ctrl.getUserOverview);
+
+/**
+ * Existing:
  * GET /api/dashboard/project/:projectId
  * Project dashboard KPIs
  */

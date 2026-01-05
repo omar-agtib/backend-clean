@@ -16,13 +16,11 @@ function initWebSocket(server) {
   io.on("connection", (socket) => {
     console.log("🟢 WS connected:", socket.id);
 
-    // ✅ Join project room
     socket.on("join:project", (projectId) => {
       if (!projectId) return;
       socket.join(projectRoom(projectId));
     });
 
-    // ✅ Join user room (notifications)
     socket.on("join:user", (userId) => {
       if (!userId) return;
       socket.join(userRoom(userId));
@@ -38,6 +36,7 @@ function initWebSocket(server) {
       socket.leave(userRoom(userId));
     });
 
+    // optional domain handlers
     planEvents.registerSocketHandlers(io, socket);
 
     socket.on("disconnect", (reason) => {

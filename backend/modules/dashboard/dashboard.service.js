@@ -1,5 +1,7 @@
 // modules/dashboard/dashboard.service.js
 const mongoose = require("mongoose");
+const Project = require("../projects/project.model");
+
 const NC = require("../nonConformity/nc.model");
 const Milestone = require("../progress/milestone.model");
 const StockItem = require("../stock/stockItem.model");
@@ -22,9 +24,12 @@ function asObjectId(id, name = "id") {
     return new mongoose.Types.ObjectId(id);
   }
 
-  return id; // already ObjectId
+  return id;
 }
 
+/**
+ * ✅ Existing: project dashboard
+ */
 exports.getProjectDashboard = async (projectId) => {
   const pid = asObjectId(projectId, "projectId");
 
@@ -194,5 +199,285 @@ exports.getProjectDashboard = async (projectId) => {
         CANCELLED: invoicesByStatus.CANCELLED || { count: 0, totalAmount: 0 },
       },
     },
+  };
+};
+
+/**
+ * ✅ NEW: global dashboard overview for logged user
+ * Aggregates across ALL projects where user is owner or member.
+ */
+exports.getUserOverview = async (userId) => {
+  const uid = asObjectId(userId, "userId");
+
+  const projects = await Project.find({
+    isDeleted: false,
+    $or: [{ owner: uid }, { "members.userId": uid }],
+  })
+    .select("_id name status updatedAt")
+    .sort({ updatedAt: -1 });
+
+  const projectIds = projects.map((p) => p._id);
+
+  // If user has no projects
+  if (projectIds.length === 0) {
+    return {
+      totals: {
+        projects: 0,
+        ncTotal: 0,
+        ncOpen: 0,
+        ncInProgress: 0,
+        ncValidated: 0,
+        stockTotalQty: 0,
+        toolsAssigned: 0,
+        invoicesTotal: 0,
+        invoicesPaid: 0,
+        invoicesUnpaid: 0,
+        milestonesTotal: 0,
+        milestonesCompleted: 0,
+        milestonesCompletionRate: 0,
+      },
+      invoicesByStatus: {
+        DRAFT: { count: 0, totalAmount: 0 },
+        SENT: { count: 0, totalAmount: 0 },
+        PAID: { count: 0, totalAmount: 0 },
+        CANCELLED: { count: 0, totalAmount: 0 },
+      },
+      projects: [],
+    };
+  }
+
+  // --- GLOBAL TOTALS ---
+  const [
+    // NC global counts
+    ncAgg,
+    // milestones global
+    milestonesAgg,
+    // stock global
+    stockAgg,
+    // tools global
+    toolsAssigned,
+    // invoices global
+    invoicesCountAgg,
+    invoicesByStatusAgg,
+  ] = await Promise.all([
+    // NC grouped by status (global)
+    NC.aggregate([
+      { $match: { projectId: { $in: projectIds }, isDeleted: false } },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+
+    // Milestones total/completed (global)
+    Milestone.aggregate([
+      { $match: { projectId: { $in: projectIds }, isDeleted: false } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          completed: { $sum: { $cond: ["$completed", 1, 0] } },
+        },
+      },
+    ]),
+
+    // Stock total qty (global)
+    StockItem.aggregate([
+      { $match: { projectId: { $in: projectIds } } },
+      { $group: { _id: null, totalQty: { $sum: "$quantity" } } },
+    ]),
+
+    // Tools assigned (global) — active only
+    ToolAssignment.countDocuments({
+      projectId: { $in: projectIds },
+      returnedAt: null,
+    }),
+
+    // Invoices total/paid/unpaid (global)
+    Invoice.aggregate([
+      { $match: { projectId: { $in: projectIds } } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          paid: { $sum: { $cond: [{ $eq: ["$status", "PAID"] }, 1, 0] } },
+          unpaid: {
+            $sum: {
+              $cond: [{ $in: ["$status", ["DRAFT", "SENT"]] }, 1, 0],
+            },
+          },
+        },
+      },
+    ]),
+
+    // Invoices by status count + totalAmount (global)
+    Invoice.aggregate([
+      { $match: { projectId: { $in: projectIds } } },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+          totalAmount: { $sum: "$amount" },
+        },
+      },
+    ]),
+  ]);
+
+  const ncMap = (ncAgg || []).reduce((acc, r) => {
+    acc[r._id] = r.count;
+    return acc;
+  }, {});
+
+  const ms = milestonesAgg?.[0] || { total: 0, completed: 0 };
+  const stockTotalQty = stockAgg?.[0]?.totalQty || 0;
+
+  const invCount = invoicesCountAgg?.[0] || { total: 0, paid: 0, unpaid: 0 };
+
+  const invoicesByStatus = (invoicesByStatusAgg || []).reduce((acc, r) => {
+    acc[r._id] = { count: r.count, totalAmount: r.totalAmount };
+    return acc;
+  }, {});
+
+  // --- PER PROJECT CARDS (lightweight) ---
+  // NC by project
+  const ncByProject = await NC.aggregate([
+    { $match: { projectId: { $in: projectIds }, isDeleted: false } },
+    {
+      $group: {
+        _id: { projectId: "$projectId", status: "$status" },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const msByProject = await Milestone.aggregate([
+    { $match: { projectId: { $in: projectIds }, isDeleted: false } },
+    {
+      $group: {
+        _id: "$projectId",
+        total: { $sum: 1 },
+        completed: { $sum: { $cond: ["$completed", 1, 0] } },
+      },
+    },
+  ]);
+
+  const stockByProject = await StockItem.aggregate([
+    { $match: { projectId: { $in: projectIds } } },
+    { $group: { _id: "$projectId", totalQty: { $sum: "$quantity" } } },
+  ]);
+
+  const toolsByProject = await ToolAssignment.aggregate([
+    { $match: { projectId: { $in: projectIds }, returnedAt: null } },
+    { $group: { _id: "$projectId", assigned: { $sum: 1 } } },
+  ]);
+
+  const invoicesByProject = await Invoice.aggregate([
+    { $match: { projectId: { $in: projectIds } } },
+    {
+      $group: {
+        _id: { projectId: "$projectId", status: "$status" },
+        count: { $sum: 1 },
+        totalAmount: { $sum: "$amount" },
+      },
+    },
+  ]);
+
+  const perProject = projects.map((p) => {
+    const pid = String(p._id);
+
+    const nc = { OPEN: 0, IN_PROGRESS: 0, VALIDATED: 0, total: 0 };
+    ncByProject
+      .filter((r) => String(r._id.projectId) === pid)
+      .forEach((r) => {
+        nc[r._id.status] = r.count;
+        nc.total += r.count;
+      });
+
+    const msRow = msByProject.find((r) => String(r._id) === pid) || {
+      total: 0,
+      completed: 0,
+    };
+
+    const completionRate =
+      msRow.total === 0 ? 0 : Math.round((msRow.completed / msRow.total) * 100);
+
+    const stockRow = stockByProject.find((r) => String(r._id) === pid);
+    const toolsRow = toolsByProject.find((r) => String(r._id) === pid);
+
+    const invRows = invoicesByProject.filter(
+      (r) => String(r._id.projectId) === pid
+    );
+
+    const inv = {
+      total: invRows.reduce((s, r) => s + r.count, 0),
+      paid: invRows
+        .filter((r) => r._id.status === "PAID")
+        .reduce((s, r) => s + r.count, 0),
+      unpaid: invRows
+        .filter((r) => r._id.status === "DRAFT" || r._id.status === "SENT")
+        .reduce((s, r) => s + r.count, 0),
+      totalAmount: invRows.reduce((s, r) => s + (r.totalAmount || 0), 0),
+    };
+
+    return {
+      _id: pid,
+      name: p.name,
+      status: p.status,
+      nc: {
+        total: nc.total,
+        open: nc.OPEN,
+        inProgress: nc.IN_PROGRESS,
+        validated: nc.VALIDATED,
+      },
+      milestones: {
+        total: msRow.total,
+        completed: msRow.completed,
+        completionRate,
+      },
+      stock: {
+        totalQty: stockRow?.totalQty || 0,
+      },
+      tools: {
+        assigned: toolsRow?.assigned || 0,
+      },
+      invoices: {
+        total: inv.total,
+        paid: inv.paid,
+        unpaid: inv.unpaid,
+        totalAmount: inv.totalAmount,
+      },
+    };
+  });
+
+  const milestonesCompletionRate =
+    ms.total === 0 ? 0 : Math.round((ms.completed / ms.total) * 100);
+
+  return {
+    totals: {
+      projects: projectIds.length,
+
+      ncTotal:
+        (ncMap.OPEN || 0) + (ncMap.IN_PROGRESS || 0) + (ncMap.VALIDATED || 0),
+      ncOpen: ncMap.OPEN || 0,
+      ncInProgress: ncMap.IN_PROGRESS || 0,
+      ncValidated: ncMap.VALIDATED || 0,
+
+      milestonesTotal: ms.total || 0,
+      milestonesCompleted: ms.completed || 0,
+      milestonesCompletionRate,
+
+      stockTotalQty,
+      toolsAssigned,
+
+      invoicesTotal: invCount.total || 0,
+      invoicesPaid: invCount.paid || 0,
+      invoicesUnpaid: invCount.unpaid || 0,
+    },
+
+    invoicesByStatus: {
+      DRAFT: invoicesByStatus.DRAFT || { count: 0, totalAmount: 0 },
+      SENT: invoicesByStatus.SENT || { count: 0, totalAmount: 0 },
+      PAID: invoicesByStatus.PAID || { count: 0, totalAmount: 0 },
+      CANCELLED: invoicesByStatus.CANCELLED || { count: 0, totalAmount: 0 },
+    },
+
+    projects: perProject,
   };
 };

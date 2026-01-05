@@ -1,12 +1,11 @@
 // src/features/nc/components/NcPanel.tsx
 import { useMemo, useState } from "react";
-import NcCard from "./NcCard";
 import EmptyState from "../../../components/EmptyState";
 
-import NcAssignModal from "./NcAssignModal";
+import NcCard from "./NcCard";
+import NcAssignModal, { type MemberForSelect } from "./NcAssignModal";
 import NcStatusModal from "./NcStatusModal";
 import NcDrawer from "./NcDrawer";
-import NcCreateModal from "./CreateNcModal";
 
 import { useNcList } from "../hooks/useNcList";
 import { useCreateNc } from "../hooks/useCreateNc";
@@ -16,6 +15,7 @@ import { useNcRealtime } from "../hooks/useNcRealtime";
 
 import { useProjectMembers } from "../../projects/hooks/useProjectMembers";
 import type { Nc, NcStatus, NcPriority } from "../api/nc.api";
+import NcCreateModal from "./CreateNcModal";
 
 type StatusFilter = NcStatus | "ALL";
 type PriorityFilter = NcPriority | "ALL";
@@ -44,6 +44,22 @@ function Chip({
   );
 }
 
+function resolveAssignedLabel(nc: Nc, membersMap: Record<string, string>) {
+  const a = (nc as any)?.assignedTo;
+
+  if (!a) return "—";
+
+  // populated user object (best)
+  if (typeof a === "object") {
+    return a.name || a.email || a._id || "—";
+  }
+
+  // string id fallback -> map
+  if (typeof a === "string") return membersMap[a] || a;
+
+  return "—";
+}
+
 export default function NcPanel({ projectId }: { projectId: string }) {
   // realtime
   useNcRealtime(projectId);
@@ -54,6 +70,14 @@ export default function NcPanel({ projectId }: { projectId: string }) {
   const change = useChangeNcStatus(projectId);
 
   const { members, membersMap } = useProjectMembers(projectId);
+
+  const membersForSelect: MemberForSelect[] = useMemo(() => {
+    return members.map((m) => ({
+      userId: m.user._id,
+      label: m.user.name || m.user.email || m.user._id,
+      role: m.role,
+    }));
+  }, [members]);
 
   const [search, setSearch] = useState("");
 
@@ -259,9 +283,7 @@ export default function NcPanel({ projectId }: { projectId: string }) {
               key={nc._id}
               nc={nc}
               onOpen={() => openNc(nc)}
-              assignedLabel={
-                nc.assignedTo ? membersMap[nc.assignedTo] || nc.assignedTo : "—"
-              }
+              assignedLabel={resolveAssignedLabel(nc, membersMap)}
             />
           ))}
         </div>
@@ -294,7 +316,7 @@ export default function NcPanel({ projectId }: { projectId: string }) {
       <NcAssignModal
         open={assignOpen}
         onClose={() => setAssignOpen(false)}
-        members={members}
+        members={membersForSelect}
         onAssign={doAssign}
         isPending={assign.isPending}
         errorMessage={

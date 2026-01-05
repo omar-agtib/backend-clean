@@ -1,24 +1,31 @@
-import { api } from "../../../lib/api";
+// src/features/auth/api/auth.api.ts
+import { http } from "../../../lib/http";
 
-export type LoginDto = { email: string; password: string };
+export type LoginDto = {
+  email: string;
+  password: string;
+};
+
+export type AuthUser = {
+  id: string;
+  email: string;
+  role: string;
+  name: string;
+};
 
 export type LoginResponse = {
-  accessToken: string; // ← Changed from "token" to "accessToken"
-  sessionId: string;
-  user: {
-    id: string;
-    email: string;
-    role: string;
-    name: string;
-  };
+  accessToken: string;
+  refreshToken?: string;
+  sessionId?: string;
+  user: AuthUser;
 };
 
 export async function loginApi(dto: LoginDto) {
-  const { data } = await api.post<LoginResponse>("/auth/login", dto);
+  const { data } = await http.post<LoginResponse>("/auth/login", dto);
   return data;
 }
 
 export async function meApi() {
-  const { data } = await api.get("/auth/me");
+  const { data } = await http.get<AuthUser>("/auth/me");
   return data;
 }

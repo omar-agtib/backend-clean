@@ -1,3 +1,4 @@
+// backend/modules/stock/product.routes.js
 const router = require("express").Router();
 const ctrl = require("./product.controller");
 const auth = require("../../middlewares/auth");

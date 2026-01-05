@@ -1,3 +1,4 @@
+// src/pages/LoginPage.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLogin } from "../features/auth/hooks/useLogin";
@@ -14,16 +15,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("123456");
 
   useEffect(() => {
-    // If already logged, go boot page
     if (token.get()) navigate("/", { replace: true });
   }, [navigate]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-
     await login.mutateAsync({ email, password });
-
-    // ✅ token already set by hook onSuccess
     navigate("/", { replace: true });
   }
 

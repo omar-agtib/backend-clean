@@ -1,6 +1,11 @@
 // src/features/nc/components/NcAssignModal.tsx
 import { useMemo, useState } from "react";
-import type { ProjectMember } from "../../projects/hooks/useProjectMembers";
+
+export type MemberForSelect = {
+  userId: string;
+  label: string; // name/email
+  role: string;
+};
 
 export default function NcAssignModal({
   open,
@@ -12,7 +17,7 @@ export default function NcAssignModal({
 }: {
   open: boolean;
   onClose: () => void;
-  members: ProjectMember[];
+  members: MemberForSelect[];
   onAssign: (userId: string) => void;
   isPending?: boolean;
   errorMessage?: string;
@@ -34,9 +39,10 @@ export default function NcAssignModal({
               Assign NC
             </div>
             <div className="text-sm text-slate-500 mt-1">
-              Pick a member (shows userId + role for now)
+              Choose a member (name shown, id sent to backend)
             </div>
           </div>
+
           <button
             onClick={onClose}
             className="rounded-xl px-3 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
@@ -56,7 +62,7 @@ export default function NcAssignModal({
               <option value="">Select member...</option>
               {members.map((m) => (
                 <option key={m.userId} value={m.userId}>
-                  {m.userId} — {m.role}
+                  {m.label} — {m.role}
                 </option>
               ))}
             </select>

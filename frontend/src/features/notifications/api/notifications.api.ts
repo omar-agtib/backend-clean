@@ -3,28 +3,24 @@ import { http } from "../../../lib/http";
 
 export type Notification = {
   _id: string;
-  userId: string;
+
+  userId?: string;
   projectId?: string;
-  type: string;
+
   title: string;
   message?: string;
-  data?: any;
+
+  kind?: "info" | "success" | "warning" | "error";
+
   isRead: boolean;
+
   createdAt: string;
   updatedAt: string;
 };
 
-export async function listMyNotifications(params?: {
-  projectId?: string;
-  unreadOnly?: boolean;
-  limit?: number;
-}) {
+export async function listNotifications(params?: { limit?: number }) {
   const { data } = await http.get<Notification[]>("/notifications", {
-    params: {
-      projectId: params?.projectId,
-      unreadOnly: params?.unreadOnly ? "true" : undefined,
-      limit: params?.limit,
-    },
+    params: { limit: params?.limit ?? 100 },
   });
   return data;
 }
@@ -36,10 +32,9 @@ export async function markNotificationRead(notificationId: string) {
   return data;
 }
 
-export async function markAllNotificationsRead(projectId?: string) {
-  const { data } = await http.post<{ message: string; modified: number }>(
-    "/notifications/read-all",
-    { projectId: projectId || undefined }
+export async function markAllNotificationsRead() {
+  const { data } = await http.patch<{ ok: true; updated: number }>(
+    "/notifications/read-all"
   );
   return data;
 }

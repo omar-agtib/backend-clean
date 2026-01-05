@@ -1,9 +1,7 @@
-// modules/nonConformity/nc.service.js
 const NC = require("./nc.model");
 const History = require("./ncHistory.model");
 const ncEvents = require("../../ws/ncEvents");
 
-// 🔔 Notifications
 const notifyService = require("../notifications/notification.service");
 const Project = require("../projects/project.model");
 
@@ -16,6 +14,11 @@ const allowedTransitions = {
 
 const allowedStatuses = ["OPEN", "IN_PROGRESS", "RESOLVED", "VALIDATED"];
 const allowedPriorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+
+// ✅ central populate
+function ncPopulate(q) {
+  return q.populate("assignedTo", "name email role");
+}
 
 async function record(nc, action, from, to, userId, comment) {
   return History.create({
@@ -68,8 +71,11 @@ exports.create = async (data, userId) => {
 
   await record(nc, "CREATED", null, "OPEN", userId, data.comment);
 
-  ncEvents.ncCreated(nc.projectId, nc);
-  return nc;
+  // ✅ emit populated version
+  const populated = await ncPopulate(NC.findById(nc._id));
+  ncEvents.ncCreated(nc.projectId, populated);
+
+  return populated;
 };
 
 exports.assign = async (nc, assigneeId, userId) => {
@@ -100,20 +106,20 @@ exports.assign = async (nc, assigneeId, userId) => {
   await nc.save();
   await record(nc, "ASSIGNED", from, to, userId);
 
-  // ✅ WS update
-  ncEvents.ncUpdated(nc.projectId, nc);
+  const populated = await ncPopulate(NC.findById(nc._id));
 
-  // 🔔 Notify assigned user
+  ncEvents.ncUpdated(nc.projectId, populated);
+
   await notifyService.createAndEmit({
     userId: assigneeId,
     projectId: nc.projectId,
     type: "NC_ASSIGNED",
     title: "New NC assigned to you",
     message: `NC "${nc.title}" has been assigned to you.`,
-    data: { ncId: nc._id, projectId: nc.projectId, status: nc.status },
+    data: { ncId: nc._id, projectId: nc.projectId, status: to },
   });
 
-  return nc;
+  return populated;
 };
 
 exports.changeStatus = async (nc, toStatus, userId, comment) => {
@@ -159,10 +165,11 @@ exports.changeStatus = async (nc, toStatus, userId, comment) => {
     comment
   );
 
-  if (toStatus === "VALIDATED") {
-    ncEvents.ncValidated(nc.projectId, nc);
+  const populated = await ncPopulate(NC.findById(nc._id));
 
-    // 🔔 Notify project members (owner + members), excluding actor
+  if (toStatus === "VALIDATED") {
+    ncEvents.ncValidated(nc.projectId, populated);
+
     const project = await Project.findById(nc.projectId);
     if (project) {
       const userIds = new Set([
@@ -180,16 +187,16 @@ exports.changeStatus = async (nc, toStatus, userId, comment) => {
             type: "NC_VALIDATED",
             title: "NC validated",
             message: `NC "${nc.title}" was validated.`,
-            data: { ncId: nc._id, projectId: nc.projectId, status: nc.status },
+            data: { ncId: nc._id, projectId: nc.projectId, status: toStatus },
           })
         )
       );
     }
   } else {
-    ncEvents.ncUpdated(nc.projectId, nc);
+    ncEvents.ncUpdated(nc.projectId, populated);
   }
 
-  return nc;
+  return populated;
 };
 
 exports.listByProject = async (projectId) => {
@@ -198,7 +205,11 @@ exports.listByProject = async (projectId) => {
     err.status = 400;
     throw err;
   }
-  return NC.find({ projectId, isDeleted: false }).sort({ createdAt: -1 });
+
+  // ✅ return populated list
+  return ncPopulate(
+    NC.find({ projectId, isDeleted: false }).sort({ createdAt: -1 })
+  );
 };
 
 exports.getHistory = async (ncId) => {
@@ -207,5 +218,7 @@ exports.getHistory = async (ncId) => {
     err.status = 400;
     throw err;
   }
-  return History.find({ ncId }).sort({ createdAt: 1 }).populate("userId");
+  return History.find({ ncId })
+    .sort({ createdAt: 1 })
+    .populate("userId", "name email");
 };

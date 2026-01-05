@@ -29,7 +29,10 @@ module.exports = (app) => {
   app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
-  app.use(rateLimit);
+  // Only apply rate limiting in production
+  if (process.env.NODE_ENV === "production") {
+    app.use(rateLimit);
+  }
 
   app.use("/api/health", require("../modules/health/health.routes"));
 
@@ -54,6 +57,7 @@ module.exports = (app) => {
   app.use("/api/billing", require("../modules/billing/billing.routes"));
   app.use("/api/dashboard", require("../modules/dashboard/dashboard.routes"));
   app.use("/api/files", require("../modules/files/files.routes"));
+  app.use("/api/search", require("../modules/search/search.routes"));
   app.use(
     "/api/notifications",
     require("../modules/notifications/notification.routes")

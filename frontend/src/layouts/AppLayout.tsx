@@ -3,17 +3,33 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useMemo } from "react";
 import { useNotifications } from "../features/notifications/hooks/useNotifications";
 import { useNotificationsRealtime } from "../features/notifications/hooks/useNotificationsRealtime";
-import { useAuthStore } from "../store/auth.store"; // if you don't have it, tell me + paste your auth store
+import { useAuthStore } from "../store/auth.store";
+import { useProjectStore } from "../store/projectStore";
 
 function AppNavItem({
   to,
   label,
   badge,
+  disabled,
 }: {
   to: string;
   label: string;
   badge?: number;
+  disabled?: boolean;
 }) {
+  if (disabled) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm font-semibold bg-slate-100 text-slate-400 cursor-not-allowed">
+        <span>{label}</span>
+        {badge && badge > 0 ? (
+          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-extrabold">
+            {badge}
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <NavLink
       to={to}
@@ -37,8 +53,10 @@ function AppNavItem({
 }
 
 export default function AppLayout() {
-  // ✅ assuming you keep auth user in a zustand store
-  const user = useAuthStore((s) => s.user); // { _id, name, ... } typical
+  const user = useAuthStore((s) => s.user);
+
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const activeProjectName = useProjectStore((s) => s.activeProjectName);
 
   // realtime notifications
   useNotificationsRealtime(user?._id || null);
@@ -50,6 +68,21 @@ export default function AppLayout() {
     const list = q.data || [];
     return list.filter((x) => !x.isRead).length;
   }, [q.data]);
+
+  const projectLabel = activeProjectId
+    ? `Active: ${activeProjectName || activeProjectId}`
+    : "No active project";
+
+  // ✅ Option A: sidebar links go to the project workspace tab
+  const stockTo = activeProjectId
+    ? `/app/projects/${activeProjectId}?tab=stock`
+    : "#";
+  const toolsTo = activeProjectId
+    ? `/app/projects/${activeProjectId}?tab=tools`
+    : "#";
+  const billingTo = activeProjectId
+    ? `/app/projects/${activeProjectId}?tab=billing`
+    : "#";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -63,6 +96,16 @@ export default function AppLayout() {
             <div className="text-xs text-slate-500 mt-1">
               {user?.name ? `Signed in as ${user.name}` : "Workspace"}
             </div>
+
+            <div className="mt-2 text-xs font-semibold text-slate-700">
+              {projectLabel}
+            </div>
+
+            {!activeProjectId ? (
+              <div className="text-xs text-slate-500 mt-1">
+                Open a project to activate the workspace.
+              </div>
+            ) : null}
           </div>
 
           <nav className="space-y-2">
@@ -73,9 +116,24 @@ export default function AppLayout() {
               label="Notifications"
               badge={unread}
             />
-            <AppNavItem to="/app/stock" label="Stock" />
-            <AppNavItem to="/app/tools" label="Tools" />
-            <AppNavItem to="/app/billing" label="Billing" />
+            <AppNavItem to="/app/search" label="Search" />
+
+            {/* ✅ Option A: go to workspace tabs */}
+            <AppNavItem
+              to={stockTo}
+              label="Stock"
+              disabled={!activeProjectId}
+            />
+            <AppNavItem
+              to={toolsTo}
+              label="Tools"
+              disabled={!activeProjectId}
+            />
+            <AppNavItem
+              to={billingTo}
+              label="Billing"
+              disabled={!activeProjectId}
+            />
           </nav>
         </aside>
 

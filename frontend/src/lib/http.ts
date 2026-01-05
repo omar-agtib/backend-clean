@@ -2,34 +2,25 @@
 import axios from "axios";
 import { token } from "./token";
 
-/**
- * In development:
- * - use "/api" so requests go to Vite (5173) and are proxied to backend (3001)
- * - this avoids CORS entirely
- *
- * In production:
- * - set VITE_API_URL to your backend URL like "https://api.yoursite.com/api"
- *   or keep it as "/api" if your production frontend server also proxies.
- */
 const isDev = import.meta.env.DEV;
-
 const baseURL = isDev ? "/api" : import.meta.env.VITE_API_URL || "/api";
 
 export const http = axios.create({
   baseURL,
-  // keep true only if you use cookies. harmless otherwise.
   withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
 });
 
-// Attach JWT token to every request (if exists)
+function normalizeJwt(t: string) {
+  return (t || "").replace(/^Bearer\s+/i, "").trim();
+}
+
 http.interceptors.request.use((config) => {
   const t = token.get();
   if (t) {
+    const raw = normalizeJwt(t);
     config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${t}`;
+    config.headers.Authorization = `Bearer ${raw}`;
   }
   return config;
 });

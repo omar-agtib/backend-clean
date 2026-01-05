@@ -1,3 +1,5 @@
+// src/features/dashboard/components/StatCard.tsx
+
 type Props = {
   label: string;
   value: number | string;

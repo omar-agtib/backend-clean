@@ -10,6 +10,22 @@ function Pill({ text }: { text: string }) {
   );
 }
 
+function resolveAssignedLabel(nc: Nc) {
+  const a = (nc as any)?.assignedTo;
+
+  if (!a) return "—";
+
+  // populated object
+  if (typeof a === "object") {
+    return a.name || a.email || a._id || "—";
+  }
+
+  // fallback string id
+  if (typeof a === "string") return a;
+
+  return "—";
+}
+
 export default function NcDrawer({
   open,
   nc,
@@ -27,6 +43,8 @@ export default function NcDrawer({
 
   if (!open || !nc) return null;
 
+  const assignedLabel = resolveAssignedLabel(nc);
+
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
@@ -43,7 +61,7 @@ export default function NcDrawer({
             <div className="mt-3 flex gap-2 flex-wrap">
               <Pill text={`Status: ${nc.status}`} />
               <Pill text={`Priority: ${nc.priority}`} />
-              <Pill text={`Assigned: ${nc.assignedTo || "—"}`} />
+              <Pill text={`Assigned: ${assignedLabel}`} />
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-// ws/progressEvents.js
+// backend/ws/progressEvents.js
 const { getIO } = require("./io");
 const { projectRoom } = require("./rooms");
 

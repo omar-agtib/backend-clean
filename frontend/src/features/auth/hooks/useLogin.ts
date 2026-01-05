@@ -1,21 +1,34 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { token } from "../../../lib/token";
-import { authKeys } from "../api/authKeys";
-import { loginApi, type LoginDto } from "../api/auth.api";
+// src/features/auth/hooks/useLogin.ts
+import { useMutation } from "@tanstack/react-query";
+import { loginApi } from "../api/auth.api";
+import { token as tokenStorage } from "../../../lib/token";
+import { useAuthStore } from "../../../store/auth.store";
+
+function normalizeJwt(t: string) {
+  return (t || "").replace(/^Bearer\s+/i, "").trim();
+}
 
 export function useLogin() {
-  const qc = useQueryClient();
+  const setAuth = useAuthStore((s) => s.setAuth);
 
   return useMutation({
-    mutationFn: (dto: LoginDto) => loginApi(dto),
-    onSuccess: async (res) => {
-      token.set(res.accessToken); // ← Changed from res.token to res.accessToken
+    mutationFn: loginApi,
+    onSuccess: (res) => {
+      const raw = normalizeJwt(res.accessToken);
 
-      // Wait for next tick to ensure localStorage is flushed
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      // ✅ store token in localStorage (source of truth)
+      tokenStorage.set(raw);
 
-      // refresh "me" after login
-      await qc.invalidateQueries({ queryKey: authKeys.me() });
+      // ✅ store user + token in zustand
+      setAuth({
+        token: raw,
+        user: {
+          _id: res.user.id, // normalize to _id for app usage
+          name: res.user.name,
+          email: res.user.email,
+          role: res.user.role,
+        },
+      });
     },
   });
 }

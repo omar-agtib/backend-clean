@@ -1,3 +1,4 @@
+// backend/modules/stock/product.controller.js
 const asyncHandler = require("express-async-handler");
 const Product = require("./product.model");
 
