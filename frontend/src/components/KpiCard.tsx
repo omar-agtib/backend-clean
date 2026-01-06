@@ -8,10 +8,12 @@ export default function KpiCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-sm font-medium text-slate-600">{label}</div>
-      <div className="mt-2 text-2xl font-extrabold text-slate-900">{value}</div>
-      {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
+    <div className="card p-4">
+      <div className="text-sm font-semibold text-mutedForeground">{label}</div>
+      <div className="mt-2 text-2xl font-extrabold">{value}</div>
+      {hint ? (
+        <div className="mt-1 text-xs text-mutedForeground">{hint}</div>
+      ) : null}
     </div>
   );
 }

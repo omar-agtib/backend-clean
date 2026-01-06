@@ -1,10 +1,11 @@
 // src/features/nc/components/NcDrawer.tsx
+import { useTranslation } from "react-i18next";
 import { useNcHistory } from "../hooks/useNcHistory";
 import type { Nc } from "../api/nc.api";
 
 function Pill({ text }: { text: string }) {
   return (
-    <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold border bg-slate-50 border-slate-200 text-slate-700">
+    <span className="chip border border-border bg-muted text-foreground">
       {text}
     </span>
   );
@@ -12,15 +13,9 @@ function Pill({ text }: { text: string }) {
 
 function resolveAssignedLabel(nc: Nc) {
   const a = (nc as any)?.assignedTo;
-
   if (!a) return "—";
 
-  // populated object
-  if (typeof a === "object") {
-    return a.name || a.email || a._id || "—";
-  }
-
-  // fallback string id
+  if (typeof a === "object") return a.name || a.email || a._id || "—";
   if (typeof a === "string") return a;
 
   return "—";
@@ -39,6 +34,7 @@ export default function NcDrawer({
   onAssignClick: () => void;
   onStatusClick: () => void;
 }) {
+  const { t } = useTranslation();
   const history = useNcHistory(nc?._id, open);
 
   if (!open || !nc) return null;
@@ -46,68 +42,71 @@ export default function NcDrawer({
   const assignedLabel = resolveAssignedLabel(nc);
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-[9999]">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
 
-      <div className="absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-xl border-l border-slate-200 p-6 overflow-y-auto">
+      <div className="absolute right-0 top-0 h-full w-full max-w-xl bg-card shadow-2xl border-l border-border p-6 overflow-y-auto">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-lg font-extrabold text-slate-900 truncate">
+            <div className="text-lg font-extrabold text-foreground truncate">
               {nc.title}
             </div>
-            <div className="text-sm text-slate-600 mt-1">
-              {nc.description || "No description"}
+            <div className="text-sm text-mutedForeground mt-1">
+              {nc.description || t("nc.drawer.noDescription")}
             </div>
-            <div className="mt-3 flex gap-2 flex-wrap">
-              <Pill text={`Status: ${nc.status}`} />
-              <Pill text={`Priority: ${nc.priority}`} />
-              <Pill text={`Assigned: ${assignedLabel}`} />
+
+            <div className="mt-4 flex gap-2 flex-wrap">
+              <Pill text={`${t("nc.drawer.status")}: ${nc.status}`} />
+              <Pill text={`${t("nc.drawer.priority")}: ${nc.priority}`} />
+              <Pill text={`${t("nc.drawer.assigned")}: ${assignedLabel}`} />
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="rounded-xl px-3 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
+            className="btn-ghost px-3 py-2"
+            type="button"
           >
-            Close
+            ✕
           </button>
         </div>
 
-        <div className="mt-4 flex gap-2">
-          <button
-            onClick={onAssignClick}
-            className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-900 text-white"
-          >
-            Assign
+        <div className="mt-5 flex gap-2 flex-wrap">
+          <button onClick={onAssignClick} className="btn-primary" type="button">
+            {t("nc.drawer.assign")}
           </button>
-          <button
-            onClick={onStatusClick}
-            className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
-          >
-            Change Status
+          <button onClick={onStatusClick} className="btn-outline" type="button">
+            {t("nc.drawer.changeStatus")}
           </button>
         </div>
 
         {/* Timeline */}
-        <div className="mt-6">
-          <div className="text-sm font-bold text-slate-900">History</div>
+        <div className="mt-8">
+          <div className="text-sm font-extrabold text-foreground">
+            {t("nc.drawer.history")}
+          </div>
 
           {history.isLoading ? (
             <div className="mt-3 space-y-2">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-12 rounded-xl bg-slate-200 animate-pulse"
+                  className="h-12 rounded-2xl bg-muted animate-pulse"
                 />
               ))}
             </div>
           ) : history.isError ? (
-            <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-              {(history.error as any)?.response?.data?.message ||
-                (history.error as Error).message}
+            <div className="mt-3 rounded-2xl border border-border bg-muted px-3 py-2 text-sm">
+              <div className="font-bold text-danger">{t("common.error")}</div>
+              <div className="text-mutedForeground mt-1 break-words">
+                {(history.error as any)?.response?.data?.message ||
+                  (history.error as Error).message}
+              </div>
             </div>
           ) : (history.data?.length || 0) === 0 ? (
-            <div className="mt-3 text-sm text-slate-600">No history yet.</div>
+            <div className="mt-3 text-sm text-mutedForeground">
+              {t("nc.drawer.noHistory")}
+            </div>
           ) : (
             <div className="mt-3 space-y-3">
               {history.data!.map((h) => {
@@ -119,34 +118,38 @@ export default function NcDrawer({
                     : "—";
 
                 return (
-                  <div
-                    key={h._id}
-                    className="rounded-2xl border border-slate-200 bg-white p-4"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-semibold text-slate-900">
+                  <div key={h._id} className="card p-4">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="font-extrabold text-foreground">
                         {h.action}
                       </div>
-                      <div className="text-xs text-slate-500">
+                      <div className="text-xs text-mutedForeground">
                         {new Date(h.createdAt).toLocaleString()}
                       </div>
                     </div>
 
-                    <div className="mt-1 text-sm text-slate-700">
-                      By: <span className="font-medium">{actor}</span>
+                    <div className="mt-1 text-sm text-mutedForeground">
+                      {t("nc.drawer.by")}:{" "}
+                      <span className="font-semibold text-foreground">
+                        {actor}
+                      </span>
                     </div>
 
                     {(h.fromStatus || h.toStatus) && (
                       <div className="mt-2 flex gap-2 flex-wrap">
                         {h.fromStatus && (
-                          <Pill text={`From: ${h.fromStatus}`} />
+                          <Pill
+                            text={`${t("nc.drawer.from")}: ${h.fromStatus}`}
+                          />
                         )}
-                        {h.toStatus && <Pill text={`To: ${h.toStatus}`} />}
+                        {h.toStatus && (
+                          <Pill text={`${t("nc.drawer.to")}: ${h.toStatus}`} />
+                        )}
                       </div>
                     )}
 
                     {h.comment && (
-                      <div className="mt-2 text-sm text-slate-600">
+                      <div className="mt-2 text-sm text-mutedForeground">
                         “{h.comment}”
                       </div>
                     )}

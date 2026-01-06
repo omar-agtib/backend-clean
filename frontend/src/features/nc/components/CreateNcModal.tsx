@@ -1,5 +1,6 @@
 // src/features/nc/components/NcCreateModal.tsx
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { NcPriority } from "../api/nc.api";
 
 export default function NcCreateModal({
@@ -19,6 +20,8 @@ export default function NcCreateModal({
   isPending?: boolean;
   errorMessage?: string;
 }) {
+  const { t } = useTranslation();
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<NcPriority>("MEDIUM");
@@ -28,76 +31,80 @@ export default function NcCreateModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
 
-      <div className="relative w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-xl p-6">
+      <div className="relative w-full max-w-lg card p-6">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-lg font-extrabold text-slate-900">New NC</div>
-            <div className="text-sm text-slate-500 mt-1">
-              Create a non-conformity item
+          <div className="min-w-0">
+            <div className="text-lg font-extrabold">{t("nc.create.title")}</div>
+            <div className="text-sm text-mutedForeground mt-1">
+              {t("nc.create.subtitle")}
             </div>
           </div>
+
           <button
             onClick={onClose}
-            className="rounded-xl px-3 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
+            className="btn-ghost px-3 py-2"
+            type="button"
           >
-            Close
+            ✕
           </button>
         </div>
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-5 grid gap-4">
           <div>
-            <label className="text-sm font-medium text-slate-700">Title</label>
+            <label className="text-sm font-semibold">
+              {t("nc.create.fields.title")}
+            </label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900"
-              placeholder="Ex: Wrong material delivered"
+              className="input mt-2"
+              placeholder={t("nc.create.fields.titlePh")}
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-700">
-              Description (optional)
+            <label className="text-sm font-semibold">
+              {t("nc.create.fields.description")}
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="mt-1 w-full min-h-[90px] rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900"
-              placeholder="More context..."
+              className="input mt-2 min-h-[110px]"
+              placeholder={t("nc.create.fields.descriptionPh")}
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-700">
-              Priority
+            <label className="text-sm font-semibold">
+              {t("nc.create.fields.priority")}
             </label>
             <select
               value={priority}
               onChange={(e) => setPriority(e.target.value as NcPriority)}
-              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+              className="input mt-2 bg-card"
             >
-              <option value="LOW">LOW</option>
-              <option value="MEDIUM">MEDIUM</option>
-              <option value="HIGH">HIGH</option>
-              <option value="CRITICAL">CRITICAL</option>
+              <option value="LOW">{t("nc.priority.LOW")}</option>
+              <option value="MEDIUM">{t("nc.priority.MEDIUM")}</option>
+              <option value="HIGH">{t("nc.priority.HIGH")}</option>
+              <option value="CRITICAL">{t("nc.priority.CRITICAL")}</option>
             </select>
           </div>
 
           {errorMessage ? (
-            <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-              {errorMessage}
+            <div className="rounded-2xl border border-border bg-muted px-3 py-2 text-sm">
+              <div className="font-bold text-danger">{t("common.error")}</div>
+              <div className="text-mutedForeground mt-1 break-words">
+                {errorMessage}
+              </div>
             </div>
           ) : null}
 
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={onClose}
-              className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
-            >
-              Cancel
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={onClose} className="btn-outline" type="button">
+              {t("common.cancel")}
             </button>
             <button
               onClick={() =>
@@ -108,9 +115,10 @@ export default function NcCreateModal({
                 })
               }
               disabled={!canSubmit || isPending}
-              className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-900 text-white disabled:opacity-60"
+              className="btn-primary disabled:opacity-60"
+              type="button"
             >
-              {isPending ? "Creating..." : "Create"}
+              {isPending ? t("nc.create.creating") : t("nc.create.create")}
             </button>
           </div>
         </div>

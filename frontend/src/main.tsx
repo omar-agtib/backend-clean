@@ -5,6 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "./i18n";
 import "./styles/globals.css";
 import AppRoutes from "./routes/AppRoutes";
+import { initTheme } from "./lib/theme";
+
+initTheme();
 
 const qc = new QueryClient({
   defaultOptions: {

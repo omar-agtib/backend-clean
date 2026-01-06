@@ -1,9 +1,10 @@
 // src/features/nc/components/NcAssignModal.tsx
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export type MemberForSelect = {
   userId: string;
-  label: string; // name/email
+  label: string;
   role: string;
 };
 
@@ -22,6 +23,7 @@ export default function NcAssignModal({
   isPending?: boolean;
   errorMessage?: string;
 }) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState("");
 
   const canAssign = useMemo(() => !!selected, [selected]);
@@ -29,37 +31,38 @@ export default function NcAssignModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
 
-      <div className="relative w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-xl p-6">
+      <div className="relative w-full max-w-lg card p-6">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-lg font-extrabold text-slate-900">
-              Assign NC
-            </div>
-            <div className="text-sm text-slate-500 mt-1">
-              Choose a member (name shown, id sent to backend)
+          <div className="min-w-0">
+            <div className="text-lg font-extrabold">{t("nc.assign.title")}</div>
+            <div className="text-sm text-mutedForeground mt-1">
+              {t("nc.assign.subtitle")}
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="rounded-xl px-3 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
+            className="btn-ghost px-3 py-2"
+            type="button"
           >
-            Close
+            ✕
           </button>
         </div>
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-5 grid gap-4">
           <div>
-            <label className="text-sm font-medium text-slate-700">Member</label>
+            <label className="text-sm font-semibold">
+              {t("nc.assign.member")}
+            </label>
             <select
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+              className="input mt-2 bg-card"
             >
-              <option value="">Select member...</option>
+              <option value="">{t("nc.assign.selectMember")}</option>
               {members.map((m) => (
                 <option key={m.userId} value={m.userId}>
                   {m.label} — {m.role}
@@ -69,24 +72,25 @@ export default function NcAssignModal({
           </div>
 
           {errorMessage ? (
-            <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-              {errorMessage}
+            <div className="rounded-2xl border border-border bg-muted px-3 py-2 text-sm">
+              <div className="font-bold text-danger">{t("common.error")}</div>
+              <div className="text-mutedForeground mt-1 break-words">
+                {errorMessage}
+              </div>
             </div>
           ) : null}
 
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={onClose}
-              className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
-            >
-              Cancel
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={onClose} className="btn-outline" type="button">
+              {t("common.cancel")}
             </button>
             <button
               onClick={() => onAssign(selected)}
               disabled={!canAssign || isPending}
-              className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-900 text-white disabled:opacity-60"
+              className="btn-primary disabled:opacity-60"
+              type="button"
             >
-              {isPending ? "Assigning..." : "Assign"}
+              {isPending ? t("nc.assign.assigning") : t("nc.assign.assign")}
             </button>
           </div>
         </div>

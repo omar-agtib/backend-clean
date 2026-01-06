@@ -1,5 +1,6 @@
 // src/features/annotations/components/AnnotationPinsOverlay.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Annotation } from "../api/annotations.api";
 
 function clamp01(n: number) {
@@ -21,6 +22,8 @@ export default function AnnotationPinsOverlay({
   onDragEnd: (a: Annotation, nx: number, ny: number) => void;
   onRightClickDelete: (a: Annotation) => void;
 }) {
+  const { t } = useTranslation();
+
   // show only PINs on current page
   const pins = useMemo(() => {
     return (annotations || [])
@@ -129,7 +132,6 @@ export default function AnnotationPinsOverlay({
     <div
       className="absolute inset-0"
       style={{
-        // Allow pins interaction, but keep overlay lightweight
         pointerEvents: "none",
       }}
     >
@@ -141,23 +143,25 @@ export default function AnnotationPinsOverlay({
         const x = isDragging && ghost ? ghost.x : gx;
         const y = isDragging && ghost ? ghost.y : gy;
 
-        // translate(-50%, -50%) to center the pin
         return (
           <button
             key={a._id}
             type="button"
-            title="Click to edit • Shift+drag to move • Right click to delete"
+            title={t("annotations.pinTooltip")}
             className={[
               "absolute -translate-x-1/2 -translate-y-1/2",
-              "h-6 w-6 rounded-full",
-              "bg-slate-900 text-white text-xs font-extrabold",
-              "shadow-md hover:scale-105 transition",
-              isDragging ? "opacity-80" : "opacity-100",
+              "h-7 w-7 rounded-full",
+              "text-xs font-extrabold",
+              "shadow-md transition",
+              "bg-[hsl(var(--primary))] text-white",
+              "hover:scale-105",
+              "ring-2 ring-white/60",
+              isDragging ? "opacity-85" : "opacity-100",
             ].join(" ")}
             style={{
               left: `${x * 100}%`,
               top: `${y * 100}%`,
-              pointerEvents: "auto", // IMPORTANT: enable interactions
+              pointerEvents: "auto",
               cursor: isDragging ? "grabbing" : "pointer",
             }}
             onClick={(e) => {

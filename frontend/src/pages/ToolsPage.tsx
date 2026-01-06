@@ -1,6 +1,8 @@
 // src/pages/ToolsPage.tsx
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+
 import SectionCard from "../components/SectionCard";
 import { useProjectStore } from "../store/projectStore";
 
@@ -26,7 +28,6 @@ import type {
   ToolMaintenance,
 } from "../features/tools/api/tools.api";
 
-// ✅ members picker
 import { useProjectMembers } from "../features/projects/hooks/useProjectMembers";
 
 function TabButton({
@@ -43,10 +44,10 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={[
-        "rounded-xl px-3 py-2 text-sm font-semibold transition",
+        "whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition border",
         active
-          ? "bg-slate-900 text-white"
-          : "bg-slate-100 hover:bg-slate-200 text-slate-900",
+          ? "bg-primary text-primaryForeground border-transparent"
+          : "bg-card border-border hover:bg-muted",
       ].join(" ")}
     >
       {label}
@@ -54,11 +55,21 @@ function TabButton({
   );
 }
 
+function formatDate(v: any) {
+  try {
+    return new Date(v).toLocaleString();
+  } catch {
+    return String(v || "");
+  }
+}
+
 export default function ToolsPage() {
+  const { t } = useTranslation();
+
   const { projectId } = useParams<{ projectId: string }>();
   const activeProjectName = useProjectStore((s) => s.activeProjectName);
 
-  // Queries
+  // Queries (unchanged)
   const invQ = useToolInventory();
   const availQ = useAvailableTools();
 
@@ -66,12 +77,12 @@ export default function ToolsPage() {
   const historyQ = useAssignmentsHistory(projectId);
   const maintenanceQ = useMaintenanceHistory(projectId);
 
-  // ✅ Members query (used for Assign UI + label fallback)
+  // Members query (unchanged)
   const membersQ = useProjectMembers(projectId || null);
   const members = membersQ.members || [];
   const membersMap = membersQ.membersMap || {};
 
-  // Mutations
+  // Mutations (unchanged)
   const createTool = useCreateTool();
   const assign = useAssignTool(projectId as string);
   const ret = useReturnTool(projectId as string);
@@ -82,7 +93,7 @@ export default function ToolsPage() {
     "inventory" | "available" | "assigned" | "history" | "maintenance"
   >("assigned");
 
-  // Modals
+  // Modals (unchanged state)
   const [createOpen, setCreateOpen] = useState(false);
   const [toolName, setToolName] = useState("");
   const [serial, setSerial] = useState("");
@@ -102,12 +113,16 @@ export default function ToolsPage() {
   const maint = maintenanceQ.data || [];
 
   const header = useMemo(() => {
-    if (!projectId) return "Tools";
-    return `Tools — ${activeProjectName || projectId}`;
-  }, [projectId, activeProjectName]);
+    if (!projectId) return t("tools.pageTitle");
+    return `${t("tools.pageTitle")} — ${activeProjectName || projectId}`;
+  }, [projectId, activeProjectName, t]);
 
   function renderError(err: any) {
-    return err?.response?.data?.message || (err as Error)?.message || "Error";
+    return (
+      err?.response?.data?.message ||
+      (err as Error)?.message ||
+      t("common.error")
+    );
   }
 
   function labelUser(u: any) {
@@ -115,14 +130,11 @@ export default function ToolsPage() {
       typeof u === "string"
         ? u
         : u?._id || u?.id || u?.userId || u?.assignedTo || "";
-    if (!id) return "Unknown user";
+    if (!id) return t("tools.unknownUser");
 
-    // Prefer populated user
     if (typeof u === "object" && u) {
       return u?.name || u?.email || membersMap[id] || id;
     }
-
-    // fallback to membersMap
     return membersMap[id] || id;
   }
 
@@ -171,83 +183,84 @@ export default function ToolsPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <div className="text-2xl font-extrabold text-slate-900">{header}</div>
-          <div className="text-sm text-slate-500">
-            Inventory + assignments + maintenance
+        <div className="min-w-0">
+          <div className="text-2xl font-extrabold truncate">{header}</div>
+          <div className="text-sm text-mutedForeground mt-1">
+            {t("tools.subtitle")}
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             type="button"
-            className="rounded-xl bg-slate-900 hover:bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
+            className="btn-primary"
             onClick={() => setCreateOpen(true)}
           >
-            + New Tool
+            {t("tools.actions.newTool")}
           </button>
 
           <button
             type="button"
-            className="rounded-xl bg-slate-100 hover:bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-900"
+            className="btn-outline"
             onClick={() => setAssignOpen(true)}
           >
-            Assign Tool
+            {t("tools.actions.assignTool")}
           </button>
 
           <button
             type="button"
-            className="rounded-xl bg-slate-100 hover:bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-900"
+            className="btn-outline"
             onClick={() => setMaintOpen(true)}
           >
-            Start Maintenance
+            {t("tools.actions.startMaintenance")}
           </button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 overflow-x-auto pb-1">
         <TabButton
           active={tab === "assigned"}
-          label={`Assigned (${activeAssigned.length})`}
+          label={t("tools.tabs.assigned", { n: activeAssigned.length })}
           onClick={() => setTab("assigned")}
         />
         <TabButton
           active={tab === "history"}
-          label={`History (${history.length})`}
+          label={t("tools.tabs.history", { n: history.length })}
           onClick={() => setTab("history")}
         />
         <TabButton
           active={tab === "maintenance"}
-          label={`Maintenance (${maint.length})`}
+          label={t("tools.tabs.maintenance", { n: maint.length })}
           onClick={() => setTab("maintenance")}
         />
         <TabButton
           active={tab === "available"}
-          label={`Available (${available.length})`}
+          label={t("tools.tabs.available", { n: available.length })}
           onClick={() => setTab("available")}
         />
         <TabButton
           active={tab === "inventory"}
-          label={`Inventory (${inventory.length})`}
+          label={t("tools.tabs.inventory", { n: inventory.length })}
           onClick={() => setTab("inventory")}
         />
       </div>
 
       {/* Assigned */}
       {tab === "assigned" && (
-        <SectionCard title="Active assigned tools">
+        <SectionCard title={t("tools.sections.activeAssigned")}>
           {activeAssignedQ.isLoading ? (
-            <div className="h-24 rounded-2xl bg-slate-200 animate-pulse" />
+            <div className="h-24 rounded-2xl bg-muted animate-pulse" />
           ) : activeAssignedQ.isError ? (
-            <div className="text-sm text-red-700">
+            <div className="text-sm text-danger">
               {renderError(activeAssignedQ.error)}
             </div>
           ) : activeAssigned.length === 0 ? (
-            <div className="text-sm text-slate-600">
-              No active assigned tools.
+            <div className="text-sm text-mutedForeground">
+              {t("tools.empty.activeAssigned")}
             </div>
           ) : (
             <div className="space-y-2">
@@ -256,32 +269,37 @@ export default function ToolsPage() {
                 return (
                   <div
                     key={a._id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"
+                    className="card p-4 flex items-center justify-between gap-3 flex-wrap"
                   >
-                    <div>
-                      <div className="font-semibold text-slate-900">
-                        {tool?.name || "Tool"}
+                    <div className="min-w-0">
+                      <div className="font-extrabold truncate">
+                        {tool?.name || t("tools.toolFallback")}
                       </div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        Assigned to: {labelUser(a.assignedTo)}
+                      <div className="text-xs text-mutedForeground mt-1">
+                        {t("tools.labels.assignedTo")}:{" "}
+                        <span className="font-semibold text-foreground">
+                          {labelUser(a.assignedTo)}
+                        </span>
                       </div>
-                      <div className="text-xs text-slate-400 mt-1">
-                        {new Date(a.assignedAt).toLocaleString()}
+                      <div className="text-xs text-mutedForeground mt-1">
+                        {formatDate(a.assignedAt)}
                       </div>
                     </div>
 
                     <button
                       type="button"
-                      className="rounded-xl bg-slate-900 hover:bg-slate-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                      className="btn-primary disabled:opacity-60"
                       disabled={ret.isPending}
                       onClick={() =>
                         ret.mutate({
                           toolId: (tool as any)?._id || String(a.toolId),
                         })
                       }
-                      title="Return tool"
+                      title={t("tools.actions.returnTool")}
                     >
-                      {ret.isPending ? "Returning..." : "Return"}
+                      {ret.isPending
+                        ? t("tools.actions.returning")
+                        : t("tools.actions.returnTool")}
                     </button>
                   </div>
                 );
@@ -290,8 +308,11 @@ export default function ToolsPage() {
           )}
 
           {ret.isError ? (
-            <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-              {renderError(ret.error)}
+            <div className="mt-3 rounded-2xl border border-border bg-muted px-3 py-2 text-sm">
+              <div className="font-bold text-danger">{t("common.error")}</div>
+              <div className="text-mutedForeground mt-1 break-words">
+                {renderError(ret.error)}
+              </div>
             </div>
           ) : null}
         </SectionCard>
@@ -299,15 +320,17 @@ export default function ToolsPage() {
 
       {/* History */}
       {tab === "history" && (
-        <SectionCard title="Assignment history">
+        <SectionCard title={t("tools.sections.history")}>
           {historyQ.isLoading ? (
-            <div className="h-24 rounded-2xl bg-slate-200 animate-pulse" />
+            <div className="h-24 rounded-2xl bg-muted animate-pulse" />
           ) : historyQ.isError ? (
-            <div className="text-sm text-red-700">
+            <div className="text-sm text-danger">
               {renderError(historyQ.error)}
             </div>
           ) : history.length === 0 ? (
-            <div className="text-sm text-slate-600">No assignments yet.</div>
+            <div className="text-sm text-mutedForeground">
+              {t("tools.empty.history")}
+            </div>
           ) : (
             <div className="space-y-2">
               {history.map((a: ToolAssignment) => {
@@ -315,37 +338,35 @@ export default function ToolsPage() {
                 const returned = !!a.returnedAt;
 
                 return (
-                  <div
-                    key={a._id}
-                    className="rounded-xl border border-slate-200 p-3"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-semibold text-slate-900">
-                        {tool?.name || "Tool"}
+                  <div key={a._id} className="card p-4">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="font-extrabold truncate">
+                        {tool?.name || t("tools.toolFallback")}
                       </div>
                       <span
                         className={[
-                          "text-xs font-semibold rounded-full px-2 py-1",
-                          returned
-                            ? "bg-slate-100 text-slate-700"
-                            : "bg-slate-900 text-white",
+                          "chip",
+                          returned ? "" : "bg-primary text-primaryForeground",
                         ].join(" ")}
                       >
-                        {returned ? "Returned" : "Active"}
+                        {returned
+                          ? t("tools.status.returned")
+                          : t("tools.status.active")}
                       </span>
                     </div>
 
-                    <div className="text-xs text-slate-500 mt-2">
-                      To: {labelUser(a.assignedTo)} · By:{" "}
-                      {labelUser(a.assignedBy)}
+                    <div className="text-xs text-mutedForeground mt-2">
+                      {t("tools.labels.to")}: {labelUser(a.assignedTo)}{" "}
+                      <span className="mx-2">•</span>
+                      {t("tools.labels.by")}: {labelUser(a.assignedBy)}
                     </div>
 
-                    <div className="text-xs text-slate-400 mt-1">
-                      Assigned: {new Date(a.assignedAt).toLocaleString()}
+                    <div className="text-xs text-mutedForeground mt-1">
+                      {t("tools.labels.assigned")}: {formatDate(a.assignedAt)}
                       {a.returnedAt
-                        ? ` · Returned: ${new Date(
+                        ? ` • ${t("tools.labels.returned")}: ${formatDate(
                             a.returnedAt
-                          ).toLocaleString()}`
+                          )}`
                         : ""}
                     </div>
                   </div>
@@ -358,16 +379,16 @@ export default function ToolsPage() {
 
       {/* Maintenance */}
       {tab === "maintenance" && (
-        <SectionCard title="Maintenance history">
+        <SectionCard title={t("tools.sections.maintenance")}>
           {maintenanceQ.isLoading ? (
-            <div className="h-24 rounded-2xl bg-slate-200 animate-pulse" />
+            <div className="h-24 rounded-2xl bg-muted animate-pulse" />
           ) : maintenanceQ.isError ? (
-            <div className="text-sm text-red-700">
+            <div className="text-sm text-danger">
               {renderError(maintenanceQ.error)}
             </div>
           ) : maint.length === 0 ? (
-            <div className="text-sm text-slate-600">
-              No maintenance records.
+            <div className="text-sm text-mutedForeground">
+              {t("tools.empty.maintenance")}
             </div>
           ) : (
             <div className="space-y-2">
@@ -378,21 +399,21 @@ export default function ToolsPage() {
                 return (
                   <div
                     key={m._id}
-                    className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 p-3"
+                    className="card p-4 flex items-start justify-between gap-3 flex-wrap"
                   >
-                    <div>
-                      <div className="font-semibold text-slate-900">
-                        {tool?.name || "Tool"}
+                    <div className="min-w-0">
+                      <div className="font-extrabold truncate">
+                        {tool?.name || t("tools.toolFallback")}
                       </div>
-                      <div className="text-sm text-slate-700 mt-1">
+                      <div className="text-sm text-mutedForeground mt-1 break-words">
                         {m.description}
                       </div>
-                      <div className="text-xs text-slate-400 mt-2">
-                        Started: {new Date(m.startedAt).toLocaleString()}
+                      <div className="text-xs text-mutedForeground mt-2">
+                        {t("tools.labels.started")}: {formatDate(m.startedAt)}
                         {m.completedAt
-                          ? ` · Completed: ${new Date(
+                          ? ` • ${t("tools.labels.completed")}: ${formatDate(
                               m.completedAt
-                            ).toLocaleString()}`
+                            )}`
                           : ""}
                       </div>
                     </div>
@@ -400,18 +421,20 @@ export default function ToolsPage() {
                     {!done ? (
                       <button
                         type="button"
-                        className="rounded-xl bg-slate-900 hover:bg-slate-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                        className="btn-primary disabled:opacity-60"
                         disabled={completeMaint.isPending}
                         onClick={() =>
                           completeMaint.mutate({ maintenanceId: m._id })
                         }
-                        title="Complete maintenance"
+                        title={t("tools.actions.completeMaintenance")}
                       >
-                        {completeMaint.isPending ? "Completing..." : "Complete"}
+                        {completeMaint.isPending
+                          ? t("tools.actions.completing")
+                          : t("tools.actions.complete")}
                       </button>
                     ) : (
-                      <span className="text-xs font-semibold rounded-full bg-slate-100 text-slate-700 px-2 py-1">
-                        Completed
+                      <span className="chip">
+                        {t("tools.status.completed")}
                       </span>
                     )}
                   </div>
@@ -421,14 +444,20 @@ export default function ToolsPage() {
           )}
 
           {startMaint.isError ? (
-            <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-              {renderError(startMaint.error)}
+            <div className="mt-3 rounded-2xl border border-border bg-muted px-3 py-2 text-sm">
+              <div className="font-bold text-danger">{t("common.error")}</div>
+              <div className="text-mutedForeground mt-1 break-words">
+                {renderError(startMaint.error)}
+              </div>
             </div>
           ) : null}
 
           {completeMaint.isError ? (
-            <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-              {renderError(completeMaint.error)}
+            <div className="mt-3 rounded-2xl border border-border bg-muted px-3 py-2 text-sm">
+              <div className="font-bold text-danger">{t("common.error")}</div>
+              <div className="text-mutedForeground mt-1 break-words">
+                {renderError(completeMaint.error)}
+              </div>
             </div>
           ) : null}
         </SectionCard>
@@ -436,25 +465,24 @@ export default function ToolsPage() {
 
       {/* Available */}
       {tab === "available" && (
-        <SectionCard title="Available tools (inventory)">
+        <SectionCard title={t("tools.sections.available")}>
           {availQ.isLoading ? (
-            <div className="h-24 rounded-2xl bg-slate-200 animate-pulse" />
+            <div className="h-24 rounded-2xl bg-muted animate-pulse" />
           ) : availQ.isError ? (
-            <div className="text-sm text-red-700">
+            <div className="text-sm text-danger">
               {renderError(availQ.error)}
             </div>
           ) : available.length === 0 ? (
-            <div className="text-sm text-slate-600">No available tools.</div>
+            <div className="text-sm text-mutedForeground">
+              {t("tools.empty.available")}
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {available.map((t: Tool) => (
-                <div
-                  key={t._id}
-                  className="rounded-xl border border-slate-200 p-3"
-                >
-                  <div className="font-semibold text-slate-900">{t.name}</div>
-                  <div className="text-xs text-slate-500 mt-1">
-                    SN: {t.serialNumber || "—"}
+              {available.map((tool: Tool) => (
+                <div key={tool._id} className="card p-4">
+                  <div className="font-extrabold">{tool.name}</div>
+                  <div className="text-xs text-mutedForeground mt-1">
+                    {t("tools.labels.sn")}: {tool.serialNumber || "—"}
                   </div>
                 </div>
               ))}
@@ -465,30 +493,25 @@ export default function ToolsPage() {
 
       {/* Inventory */}
       {tab === "inventory" && (
-        <SectionCard title="All tools (inventory)">
+        <SectionCard title={t("tools.sections.inventory")}>
           {invQ.isLoading ? (
-            <div className="h-24 rounded-2xl bg-slate-200 animate-pulse" />
+            <div className="h-24 rounded-2xl bg-muted animate-pulse" />
           ) : invQ.isError ? (
-            <div className="text-sm text-red-700">
-              {renderError(invQ.error)}
-            </div>
+            <div className="text-sm text-danger">{renderError(invQ.error)}</div>
           ) : inventory.length === 0 ? (
-            <div className="text-sm text-slate-600">No tools yet.</div>
+            <div className="text-sm text-mutedForeground">
+              {t("tools.empty.inventory")}
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {inventory.map((t: Tool) => (
-                <div
-                  key={t._id}
-                  className="rounded-xl border border-slate-200 p-3"
-                >
+              {inventory.map((tool: Tool) => (
+                <div key={tool._id} className="card p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="font-semibold text-slate-900">{t.name}</div>
-                    <span className="text-xs font-semibold rounded-full bg-slate-100 text-slate-700 px-2 py-1">
-                      {t.status}
-                    </span>
+                    <div className="font-extrabold">{tool.name}</div>
+                    <span className="chip">{tool.status}</span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-1">
-                    SN: {t.serialNumber || "—"}
+                  <div className="text-xs text-mutedForeground mt-1">
+                    {t("tools.labels.sn")}: {tool.serialNumber || "—"}
                   </div>
                 </div>
               ))}
@@ -499,58 +522,63 @@ export default function ToolsPage() {
 
       {/* CREATE TOOL MODAL */}
       {createOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
           <div
             className="absolute inset-0 bg-black/30"
             onClick={() => setCreateOpen(false)}
           />
-          <div className="relative w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-xl p-6">
+          <div className="relative w-full max-w-lg card p-6">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-lg font-extrabold text-slate-900">
-                  Create Tool
+              <div className="min-w-0">
+                <div className="text-lg font-extrabold">
+                  {t("tools.modals.create.title")}
                 </div>
-                <div className="text-sm text-slate-500 mt-1">
-                  Add a tool to inventory
+                <div className="text-sm text-mutedForeground mt-1">
+                  {t("tools.modals.create.subtitle")}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setCreateOpen(false)}
-                className="rounded-xl px-3 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
+                className="btn-ghost px-3 py-2"
               >
-                Close
+                ✕
               </button>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-5 grid gap-4">
               <div>
-                <label className="text-sm font-medium text-slate-700">
-                  Name
+                <label className="text-sm font-semibold">
+                  {t("tools.modals.create.name")}
                 </label>
                 <input
                   value={toolName}
                   onChange={(e) => setToolName(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900"
-                  placeholder="Hammer"
+                  className="input mt-2"
+                  placeholder={t("tools.modals.create.namePh")}
                 />
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">
-                  Serial number (optional)
+                <label className="text-sm font-semibold">
+                  {t("tools.modals.create.serial")}
                 </label>
                 <input
                   value={serial}
                   onChange={(e) => setSerial(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900"
-                  placeholder="SN-001"
+                  className="input mt-2"
+                  placeholder={t("tools.modals.create.serialPh")}
                 />
               </div>
 
               {createTool.isError ? (
-                <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-                  {renderError(createTool.error)}
+                <div className="rounded-2xl border border-border bg-muted px-3 py-2 text-sm">
+                  <div className="font-bold text-danger">
+                    {t("common.error")}
+                  </div>
+                  <div className="text-mutedForeground mt-1 break-words">
+                    {renderError(createTool.error)}
+                  </div>
                 </div>
               ) : null}
 
@@ -558,17 +586,19 @@ export default function ToolsPage() {
                 <button
                   type="button"
                   onClick={() => setCreateOpen(false)}
-                  className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
+                  className="btn-outline"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="button"
                   onClick={submitCreate}
                   disabled={createTool.isPending || !toolName.trim()}
-                  className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-900 text-white disabled:opacity-60"
+                  className="btn-primary disabled:opacity-60"
                 >
-                  {createTool.isPending ? "Creating..." : "Create"}
+                  {createTool.isPending
+                    ? t("tools.modals.create.creating")
+                    : t("tools.modals.create.create")}
                 </button>
               </div>
             </div>
@@ -576,91 +606,101 @@ export default function ToolsPage() {
         </div>
       )}
 
-      {/* ASSIGN TOOL MODAL (UPDATED WITH MEMBERS PICKER) */}
+      {/* ASSIGN TOOL MODAL */}
       {assignOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
           <div
             className="absolute inset-0 bg-black/30"
             onClick={() => setAssignOpen(false)}
           />
-          <div className="relative w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-xl p-6">
+          <div className="relative w-full max-w-lg card p-6">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-lg font-extrabold text-slate-900">
-                  Assign Tool
+              <div className="min-w-0">
+                <div className="text-lg font-extrabold">
+                  {t("tools.modals.assign.title")}
                 </div>
-                <div className="text-sm text-slate-500 mt-1">
-                  Pick a tool + member
+                <div className="text-sm text-mutedForeground mt-1">
+                  {t("tools.modals.assign.subtitle")}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setAssignOpen(false)}
-                className="rounded-xl px-3 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
+                className="btn-ghost px-3 py-2"
               >
-                Close
+                ✕
               </button>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-5 grid gap-4">
               <div>
-                <label className="text-sm font-medium text-slate-700">
-                  Tool
+                <label className="text-sm font-semibold">
+                  {t("tools.modals.assign.tool")}
                 </label>
                 <select
                   value={assignToolId}
                   onChange={(e) => setAssignToolId(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                  className="input mt-2 bg-card"
                 >
-                  <option value="">Select tool</option>
-                  {available.map((t: Tool) => (
-                    <option key={t._id} value={t._id}>
-                      {t.name} {t.serialNumber ? `(${t.serialNumber})` : ""}
+                  <option value="">
+                    {t("tools.modals.assign.selectTool")}
+                  </option>
+                  {available.map((tool: Tool) => (
+                    <option key={tool._id} value={tool._id}>
+                      {tool.name}{" "}
+                      {tool.serialNumber ? `(${tool.serialNumber})` : ""}
                     </option>
                   ))}
                 </select>
-                <div className="text-xs text-slate-500 mt-1">
-                  Only AVAILABLE tools are shown here.
+                <div className="text-xs text-mutedForeground mt-2">
+                  {t("tools.modals.assign.onlyAvailable")}
                 </div>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">
-                  Member
+                <label className="text-sm font-semibold">
+                  {t("tools.modals.assign.member")}
                 </label>
                 <select
                   value={assignedToId}
                   onChange={(e) => setAssignedToId(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                  className="input mt-2 bg-card"
                   disabled={membersQ.isLoading || members.length === 0}
                 >
                   <option value="">
                     {membersQ.isLoading
-                      ? "Loading members..."
+                      ? t("tools.modals.assign.loadingMembers")
                       : members.length === 0
-                      ? "No members found"
-                      : "Select member"}
+                      ? t("tools.modals.assign.noMembers")
+                      : t("tools.modals.assign.selectMember")}
                   </option>
-                  {members.map((m) => (
+                  {members.map((m: any) => (
                     <option key={m.user._id} value={m.user._id}>
                       {m.user.name || m.user.email || m.user._id} — {m.role}
                     </option>
                   ))}
                 </select>
+
                 {membersQ.isError ? (
-                  <div className="text-xs text-red-700 mt-1">
-                    Failed to load members: {renderError(membersQ.error)}
+                  <div className="text-xs text-danger mt-2">
+                    {t("tools.modals.assign.membersError")}:{" "}
+                    {renderError(membersQ.error)}
                   </div>
                 ) : (
-                  <div className="text-xs text-slate-500 mt-1">
-                    Members come from: GET /api/projects/:projectId
+                  <div className="text-xs text-mutedForeground mt-2">
+                    {t("tools.modals.assign.membersHint")}
                   </div>
                 )}
               </div>
 
               {assign.isError ? (
-                <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-                  {renderError(assign.error)}
+                <div className="rounded-2xl border border-border bg-muted px-3 py-2 text-sm">
+                  <div className="font-bold text-danger">
+                    {t("common.error")}
+                  </div>
+                  <div className="text-mutedForeground mt-1 break-words">
+                    {renderError(assign.error)}
+                  </div>
                 </div>
               ) : null}
 
@@ -668,9 +708,9 @@ export default function ToolsPage() {
                 <button
                   type="button"
                   onClick={() => setAssignOpen(false)}
-                  className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
+                  className="btn-outline"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="button"
@@ -678,9 +718,11 @@ export default function ToolsPage() {
                   disabled={
                     assign.isPending || !assignToolId || !assignedToId.trim()
                   }
-                  className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-900 text-white disabled:opacity-60"
+                  className="btn-primary disabled:opacity-60"
                 >
-                  {assign.isPending ? "Assigning..." : "Assign"}
+                  {assign.isPending
+                    ? t("tools.modals.assign.assigning")
+                    : t("tools.modals.assign.assign")}
                 </button>
               </div>
             </div>
@@ -690,69 +732,76 @@ export default function ToolsPage() {
 
       {/* MAINTENANCE MODAL */}
       {maintOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
           <div
             className="absolute inset-0 bg-black/30"
             onClick={() => setMaintOpen(false)}
           />
-          <div className="relative w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-xl p-6">
+          <div className="relative w-full max-w-lg card p-6">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-lg font-extrabold text-slate-900">
-                  Start Maintenance
+              <div className="min-w-0">
+                <div className="text-lg font-extrabold">
+                  {t("tools.modals.maintenance.title")}
                 </div>
-                <div className="text-sm text-slate-500 mt-1">
-                  Set a tool to MAINTENANCE
+                <div className="text-sm text-mutedForeground mt-1">
+                  {t("tools.modals.maintenance.subtitle")}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setMaintOpen(false)}
-                className="rounded-xl px-3 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
+                className="btn-ghost px-3 py-2"
               >
-                Close
+                ✕
               </button>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-5 grid gap-4">
               <div>
-                <label className="text-sm font-medium text-slate-700">
-                  Tool
+                <label className="text-sm font-semibold">
+                  {t("tools.modals.maintenance.tool")}
                 </label>
                 <select
                   value={maintToolId}
                   onChange={(e) => setMaintToolId(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                  className="input mt-2 bg-card"
                 >
-                  <option value="">Select tool</option>
+                  <option value="">
+                    {t("tools.modals.maintenance.selectTool")}
+                  </option>
                   {inventory
-                    .filter((t: Tool) => t.status !== "ASSIGNED")
-                    .map((t: Tool) => (
-                      <option key={t._id} value={t._id}>
-                        {t.name} — {t.status}
+                    .filter((tool: Tool) => tool.status !== "ASSIGNED")
+                    .map((tool: Tool) => (
+                      <option key={tool._id} value={tool._id}>
+                        {tool.name} — {tool.status}
                       </option>
                     ))}
                 </select>
-                <div className="text-xs text-slate-500 mt-1">
-                  You can’t start maintenance if tool is ASSIGNED.
+                <div className="text-xs text-mutedForeground mt-2">
+                  {t("tools.modals.maintenance.rule")}
                 </div>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-slate-700">
-                  Description
+                <label className="text-sm font-semibold">
+                  {t("tools.modals.maintenance.description")}
                 </label>
                 <textarea
                   value={maintDesc}
                   onChange={(e) => setMaintDesc(e.target.value)}
-                  className="mt-1 w-full min-h-[90px] rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900"
-                  placeholder="Broken handle, needs repair..."
+                  className="input mt-2 min-h-[110px]"
+                  placeholder={t("tools.modals.maintenance.descriptionPh")}
                 />
               </div>
 
               {startMaint.isError ? (
-                <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-                  {renderError(startMaint.error)}
+                <div className="rounded-2xl border border-border bg-muted px-3 py-2 text-sm">
+                  <div className="font-bold text-danger">
+                    {t("common.error")}
+                  </div>
+                  <div className="text-mutedForeground mt-1 break-words">
+                    {renderError(startMaint.error)}
+                  </div>
                 </div>
               ) : null}
 
@@ -760,9 +809,9 @@ export default function ToolsPage() {
                 <button
                   type="button"
                   onClick={() => setMaintOpen(false)}
-                  className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900"
+                  className="btn-outline"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="button"
@@ -770,9 +819,11 @@ export default function ToolsPage() {
                   disabled={
                     startMaint.isPending || !maintToolId || !maintDesc.trim()
                   }
-                  className="rounded-xl px-4 py-2 text-sm font-semibold bg-slate-900 text-white disabled:opacity-60"
+                  className="btn-primary disabled:opacity-60"
                 >
-                  {startMaint.isPending ? "Starting..." : "Start"}
+                  {startMaint.isPending
+                    ? t("tools.modals.maintenance.starting")
+                    : t("tools.modals.maintenance.start")}
                 </button>
               </div>
             </div>

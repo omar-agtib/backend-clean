@@ -5,8 +5,10 @@ import { useMe } from "../features/auth/hooks/useMe";
 import SiteLoader from "../components/SiteLoader";
 import { token } from "../lib/token";
 import { useAuthStore } from "../store/auth.store";
+import { useTranslation } from "react-i18next";
 
 export default function BootPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const setUser = useAuthStore((s) => s.setUser);
@@ -22,7 +24,6 @@ export default function BootPage() {
     }
 
     if (me.isSuccess) {
-      // normalize user to store shape (_id)
       setUser({
         _id: (me.data as any).id,
         name: (me.data as any).name,
@@ -42,13 +43,11 @@ export default function BootPage() {
   }, [hasToken, me.isSuccess, me.isError, me.data, navigate, setUser, clear]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <SiteLoader
-          title="Loading chantier..."
-          subtitle={
-            hasToken ? "Verifying your session" : "Preparing login screen"
-          }
+          title={t("boot.loadingApp")}
+          subtitle={hasToken ? t("boot.verifying") : t("boot.preparing")}
           isSpinning={me.isFetching || me.isPending}
         />
       </div>

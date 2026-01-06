@@ -1,17 +1,20 @@
 // src/features/nc/components/NcCard.tsx
+import { useTranslation } from "react-i18next";
 import type { Nc } from "../api/nc.api";
 
-function badge(status: string) {
-  const base =
-    "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold border";
-  if (status === "OPEN") return `${base} bg-red-50 border-red-200 text-red-800`;
+function badgeClasses(status: string) {
+  const base = "chip font-extrabold border";
+
+  if (status === "OPEN")
+    return `${base} bg-[rgba(239,68,68,0.12)] border-[rgba(239,68,68,0.25)]`;
   if (status === "IN_PROGRESS")
-    return `${base} bg-amber-50 border-amber-200 text-amber-800`;
+    return `${base} bg-[rgba(245,158,11,0.14)] border-[rgba(245,158,11,0.25)]`;
   if (status === "RESOLVED")
-    return `${base} bg-blue-50 border-blue-200 text-blue-800`;
+    return `${base} bg-[hsl(var(--primary)/0.12)] border-[hsl(var(--primary)/0.25)]`;
   if (status === "VALIDATED")
-    return `${base} bg-emerald-50 border-emerald-200 text-emerald-800`;
-  return `${base} bg-slate-50 border-slate-200 text-slate-800`;
+    return `${base} bg-[rgba(34,197,94,0.12)] border-[rgba(34,197,94,0.25)]`;
+
+  return `${base} bg-muted border-border`;
 }
 
 export default function NcCard({
@@ -23,31 +26,37 @@ export default function NcCard({
   onOpen: () => void;
   assignedLabel?: string;
 }) {
+  const { t } = useTranslation();
+
   return (
     <button
       onClick={onOpen}
-      className="text-left w-full rounded-2xl bg-white border border-slate-200 shadow-sm p-4 hover:border-slate-300 hover:shadow transition"
+      className={[
+        "text-left w-full rounded-2xl border border-border bg-card p-4 transition",
+        "hover:bg-muted hover:shadow-sm",
+      ].join(" ")}
+      type="button"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="font-semibold text-slate-900 truncate">
+          <div className="font-extrabold text-foreground truncate">
             {nc.title}
           </div>
-          <div className="text-sm text-slate-600 mt-1 line-clamp-2">
-            {nc.description || "No description"}
+          <div className="text-sm text-mutedForeground mt-1 line-clamp-2">
+            {nc.description || t("nc.card.noDescription")}
           </div>
         </div>
 
         <div className="shrink-0 flex flex-col items-end gap-2">
-          <span className={badge(nc.status)}>{nc.status}</span>
-          <div className="text-xs text-slate-500">{nc.priority}</div>
+          <span className={badgeClasses(nc.status)}>{nc.status}</span>
+          <div className="text-xs text-mutedForeground">{nc.priority}</div>
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+      <div className="mt-3 flex items-center justify-between gap-3 text-xs text-mutedForeground flex-wrap">
         <div>
-          Assigned:{" "}
-          <span className="text-slate-700 font-medium">
+          {t("nc.card.assigned")}:{" "}
+          <span className="text-foreground font-semibold">
             {assignedLabel || "—"}
           </span>
         </div>

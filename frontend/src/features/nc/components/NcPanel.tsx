@@ -1,5 +1,6 @@
 // src/features/nc/components/NcPanel.tsx
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import EmptyState from "../../../components/EmptyState";
 
 import NcCard from "./NcCard";
@@ -33,11 +34,11 @@ function Chip({
     <button
       onClick={onClick}
       className={[
-        "px-3 py-1.5 rounded-full text-xs font-semibold border transition",
-        active
-          ? "bg-slate-900 text-white border-slate-900"
-          : "bg-white text-slate-700 border-slate-200 hover:border-slate-300",
+        "px-3 py-1.5 rounded-full text-xs font-extrabold border transition whitespace-nowrap",
+        "bg-card border-border hover:bg-muted",
+        active ? "ring-2 ring-[hsl(var(--ring)/0.18)]" : "",
       ].join(" ")}
+      type="button"
     >
       {label}
     </button>
@@ -46,22 +47,18 @@ function Chip({
 
 function resolveAssignedLabel(nc: Nc, membersMap: Record<string, string>) {
   const a = (nc as any)?.assignedTo;
-
   if (!a) return "—";
 
-  // populated user object (best)
-  if (typeof a === "object") {
-    return a.name || a.email || a._id || "—";
-  }
-
-  // string id fallback -> map
+  if (typeof a === "object") return a.name || a.email || a._id || "—";
   if (typeof a === "string") return membersMap[a] || a;
 
   return "—";
 }
 
 export default function NcPanel({ projectId }: { projectId: string }) {
-  // realtime
+  const { t } = useTranslation();
+
+  // realtime (unchanged)
   useNcRealtime(projectId);
 
   const q = useNcList(projectId);
@@ -81,11 +78,11 @@ export default function NcPanel({ projectId }: { projectId: string }) {
 
   const [search, setSearch] = useState("");
 
-  // filters
+  // filters (unchanged)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("ALL");
 
-  // Modals + drawer state
+  // Modals + drawer state (unchanged)
   const [createOpen, setCreateOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
@@ -116,13 +113,10 @@ export default function NcPanel({ projectId }: { projectId: string }) {
       );
     }
 
-    if (statusFilter !== "ALL") {
+    if (statusFilter !== "ALL")
       list = list.filter((x) => x.status === statusFilter);
-    }
-
-    if (priorityFilter !== "ALL") {
+    if (priorityFilter !== "ALL")
       list = list.filter((x) => x.priority === priorityFilter);
-    }
 
     return list;
   }, [q.data, search, statusFilter, priorityFilter]);
@@ -130,13 +124,10 @@ export default function NcPanel({ projectId }: { projectId: string }) {
   if (q.isLoading) {
     return (
       <div className="space-y-4">
-        <div className="h-10 w-64 rounded-xl bg-slate-200 animate-pulse" />
+        <div className="h-10 w-64 rounded-2xl bg-muted animate-pulse" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-28 rounded-2xl bg-slate-200 animate-pulse"
-            />
+            <div key={i} className="h-28 rounded-2xl bg-muted animate-pulse" />
           ))}
         </div>
       </div>
@@ -146,7 +137,7 @@ export default function NcPanel({ projectId }: { projectId: string }) {
   if (q.isError) {
     return (
       <EmptyState
-        title="Failed to load NC"
+        title={t("nc.errorTitle")}
         subtitle={
           (q.error as any)?.response?.data?.message ||
           (q.error as Error).message
@@ -154,9 +145,10 @@ export default function NcPanel({ projectId }: { projectId: string }) {
         action={
           <button
             onClick={() => q.refetch()}
-            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            className="btn-primary"
+            type="button"
           >
-            Retry
+            {t("common.retry")}
           </button>
         }
       />
@@ -197,83 +189,98 @@ export default function NcPanel({ projectId }: { projectId: string }) {
   const list = filtered;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header row */}
       <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <div className="text-xl font-extrabold text-slate-900">NC</div>
-          <div className="text-sm text-slate-500">
-            Track non-conformities (create, assign, status)
+        <div className="min-w-0">
+          <div className="text-xl font-extrabold">{t("nc.title")}</div>
+          <div className="text-sm text-mutedForeground mt-1">
+            {t("nc.subtitle")}
           </div>
         </div>
 
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex gap-2 w-full sm:w-auto flex-wrap">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search NC..."
-            className="w-full sm:w-80 rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+            placeholder={t("nc.searchPh")}
+            className="input w-full sm:w-80"
           />
           <button
             onClick={() => setCreateOpen(true)}
-            className="shrink-0 rounded-xl bg-slate-900 hover:bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
+            className="btn-primary shrink-0"
+            type="button"
           >
-            + New
+            {t("nc.new")}
           </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <Chip
-          active={statusFilter === "ALL"}
-          label={`All (${counts.total})`}
-          onClick={() => setStatusFilter("ALL")}
-        />
-        <Chip
-          active={statusFilter === "OPEN"}
-          label={`Open (${counts.byStatus.OPEN || 0})`}
-          onClick={() => setStatusFilter("OPEN")}
-        />
-        <Chip
-          active={statusFilter === "IN_PROGRESS"}
-          label={`In Progress (${counts.byStatus.IN_PROGRESS || 0})`}
-          onClick={() => setStatusFilter("IN_PROGRESS")}
-        />
-        <Chip
-          active={statusFilter === "RESOLVED"}
-          label={`Resolved (${counts.byStatus.RESOLVED || 0})`}
-          onClick={() => setStatusFilter("RESOLVED")}
-        />
-        <Chip
-          active={statusFilter === "VALIDATED"}
-          label={`Validated (${counts.byStatus.VALIDATED || 0})`}
-          onClick={() => setStatusFilter("VALIDATED")}
-        />
-
-        <div className="w-full h-px bg-slate-100 my-1" />
-
-        <Chip
-          active={priorityFilter === "ALL"}
-          label="Priority: All"
-          onClick={() => setPriorityFilter("ALL")}
-        />
-        {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((p) => (
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="flex flex-wrap gap-2">
           <Chip
-            key={p}
-            active={priorityFilter === p}
-            label={`${p} (${counts.byPriority[p] || 0})`}
-            onClick={() => setPriorityFilter(p)}
+            active={statusFilter === "ALL"}
+            label={t("nc.filters.all", { n: counts.total })}
+            onClick={() => setStatusFilter("ALL")}
           />
-        ))}
+          <Chip
+            active={statusFilter === "OPEN"}
+            label={t("nc.filters.open", { n: counts.byStatus.OPEN || 0 })}
+            onClick={() => setStatusFilter("OPEN")}
+          />
+          <Chip
+            active={statusFilter === "IN_PROGRESS"}
+            label={t("nc.filters.inProgress", {
+              n: counts.byStatus.IN_PROGRESS || 0,
+            })}
+            onClick={() => setStatusFilter("IN_PROGRESS")}
+          />
+          <Chip
+            active={statusFilter === "RESOLVED"}
+            label={t("nc.filters.resolved", {
+              n: counts.byStatus.RESOLVED || 0,
+            })}
+            onClick={() => setStatusFilter("RESOLVED")}
+          />
+          <Chip
+            active={statusFilter === "VALIDATED"}
+            label={t("nc.filters.validated", {
+              n: counts.byStatus.VALIDATED || 0,
+            })}
+            onClick={() => setStatusFilter("VALIDATED")}
+          />
+        </div>
+
+        <div className="my-3 h-px bg-border" />
+
+        <div className="flex flex-wrap gap-2">
+          <Chip
+            active={priorityFilter === "ALL"}
+            label={t("nc.filters.priorityAll")}
+            onClick={() => setPriorityFilter("ALL")}
+          />
+          {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((p) => (
+            <Chip
+              key={p}
+              active={priorityFilter === p}
+              label={t(`nc.filters.priority.${p}`, {
+                n: counts.byPriority[p] || 0,
+              })}
+              onClick={() => setPriorityFilter(p)}
+            />
+          ))}
+        </div>
       </div>
 
       {/* List */}
       {list.length === 0 ? (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-          <div className="font-semibold text-slate-900">No NC found</div>
-          <div className="text-sm text-slate-600 mt-1">
-            Try changing filters or create a new NC.
+        <div className="card p-6">
+          <div className="font-extrabold text-foreground">
+            {t("nc.emptyTitle")}
+          </div>
+          <div className="text-sm text-mutedForeground mt-1">
+            {t("nc.emptySubtitle")}
           </div>
         </div>
       ) : (

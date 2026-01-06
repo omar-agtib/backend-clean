@@ -7,6 +7,9 @@ import { useAuthStore } from "../store/auth.store";
 import { useProjectStore } from "../store/projectStore";
 import { token } from "../lib/token";
 import ToastHost from "../components/ToastHost";
+import ThemeToggle from "../components/ThemeToggle";
+import LanguageToggle from "../components/LanguageToggle";
+import { cn } from "../lib/cn";
 
 function AppNavItem({
   to,
@@ -21,13 +24,9 @@ function AppNavItem({
 }) {
   if (disabled) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm font-semibold bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-slate-900/60 dark:text-slate-500">
+      <div className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm text-mutedForeground bg-muted border border-border cursor-not-allowed">
         <span>{label}</span>
-        {badge && badge > 0 ? (
-          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-extrabold">
-            {badge}
-          </span>
-        ) : null}
+        {badge && badge > 0 ? <span className="chip">{badge}</span> : null}
       </div>
     );
   }
@@ -36,18 +35,24 @@ function AppNavItem({
     <NavLink
       to={to}
       className={({ isActive }) =>
-        [
-          "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition",
-          "dark:text-slate-100",
+        cn(
+          "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm transition border",
           isActive
-            ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-            : "bg-slate-100 hover:bg-slate-200 text-slate-900 dark:bg-slate-900/60 dark:hover:bg-slate-900",
-        ].join(" ")
+            ? "bg-primary text-primaryForeground border-transparent"
+            : "bg-card border-border hover:bg-muted"
+        )
       }
+      end
     >
       <span>{label}</span>
       {badge && badge > 0 ? (
-        <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-extrabold">
+        <span
+          className={cn(
+            "chip border-transparent",
+            "bg-black/10 text-current",
+            "dark:bg-white/10"
+          )}
+        >
           {badge}
         </span>
       ) : null}
@@ -66,7 +71,7 @@ export default function AppLayout() {
   // realtime notifications
   useNotificationsRealtime(user?._id || null);
 
-  // badge
+  // unread badge
   const q = useNotifications({ limit: 100 });
   const unread = useMemo(() => {
     const list = q.data || [];
@@ -84,55 +89,68 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      {/* ✅ global toasts */}
+    <div className="min-h-screen bg-background">
       <ToastHost />
 
-      <div className="mx-auto max-w-7xl px-4 py-5 grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Sidebar */}
-        <aside className="lg:col-span-3 space-y-3">
-          <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 dark:bg-slate-950 dark:border-slate-800">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-lg font-extrabold">Chantier</div>
-                <div className="text-xs text-slate-500 mt-1 dark:text-slate-400">
-                  {user?.name ? `Signed in as ${user.name}` : "Workspace"}
-                </div>
-
-                <div className="mt-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  {projectLabel}
-                </div>
-
-                {!activeProjectId ? (
-                  <div className="text-xs text-slate-500 mt-1 dark:text-slate-400">
-                    Open a project to activate the workspace.
-                  </div>
-                ) : null}
+      {/* Top bar */}
+      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
+        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 rounded-2xl bg-primary text-primaryForeground grid place-items-center shadow-soft">
+              <span className="font-bold">C</span>
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold leading-tight truncate">
+                Chantier
               </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={logout}
-                  className="rounded-xl bg-slate-100 hover:bg-slate-200 px-3 py-2 text-xs font-semibold text-slate-900"
-                  title="Logout"
-                >
-                  Logout
-                </button>
+              <div className="text-xs text-mutedForeground truncate">
+                {projectLabel}
               </div>
+              {!activeProjectId ? (
+                <div className="text-xs text-mutedForeground mt-1">
+                  Open a project to activate the workspace.
+                </div>
+              ) : null}
             </div>
           </div>
 
-          <nav className="space-y-2">
-            <AppNavItem to="/app/search" label="Search" />
-            <AppNavItem to="/app" label="Dashboard" />
-            <AppNavItem to="/app/projects" label="Projects" />
-            <AppNavItem
-              to="/app/notifications"
-              label="Notifications"
-              badge={unread}
-            />
-          </nav>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <ThemeToggle />
+            <button className="btn-ghost" onClick={logout}>
+              Logout
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Body */}
+      <div className="mx-auto max-w-6xl px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Sidebar */}
+        <aside className="lg:col-span-3">
+          <div className="card p-4">
+            <div className="text-xs text-mutedForeground mb-3">Navigation</div>
+
+            <nav className="grid gap-2">
+              <AppNavItem to="/app" label="Dashboard" />
+              <AppNavItem to="/app/projects" label="Projects" />
+              <AppNavItem to="/app/search" label="Search" />
+              <AppNavItem
+                to="/app/notifications"
+                label="Notifications"
+                badge={unread}
+              />
+            </nav>
+
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="text-xs text-mutedForeground">
+                Signed in as{" "}
+                <span className="text-foreground font-medium">
+                  {user?.email || user?.name || "User"}
+                </span>
+              </div>
+            </div>
+          </div>
         </aside>
 
         {/* Main */}

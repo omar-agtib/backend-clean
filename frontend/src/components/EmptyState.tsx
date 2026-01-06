@@ -1,3 +1,5 @@
+import type React from "react";
+
 export default function EmptyState({
   title,
   subtitle,
@@ -8,11 +10,17 @@ export default function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-      <div className="mx-auto mb-3 h-12 w-12 rounded-2xl bg-slate-100" />
-      <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-      {subtitle && <p className="mt-1 text-sm text-slate-600">{subtitle}</p>}
-      {action && <div className="mt-5 flex justify-center">{action}</div>}
+    <div className="card p-8 text-center">
+      <div className="mx-auto mb-3 h-12 w-12 rounded-2xl bg-muted grid place-items-center">
+        <div className="h-5 w-5 rounded-full bg-foreground/10" />
+      </div>
+
+      <h2 className="text-lg font-extrabold">{title}</h2>
+      {subtitle ? (
+        <p className="mt-1 text-sm text-mutedForeground">{subtitle}</p>
+      ) : null}
+
+      {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
     </div>
   );
 }

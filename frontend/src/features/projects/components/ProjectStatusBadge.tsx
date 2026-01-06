@@ -1,33 +1,30 @@
-const MAP: Record<string, { label: string; cls: string }> = {
-  PLANNING: {
-    label: "Planning",
-    cls: "bg-slate-100 text-slate-700 border-slate-200",
-  },
-  ACTIVE: {
-    label: "Active",
-    cls: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  },
-  COMPLETED: {
-    label: "Completed",
-    cls: "bg-blue-50 text-blue-700 border-blue-200",
-  },
-  ARCHIVED: {
-    label: "Archived",
-    cls: "bg-zinc-50 text-zinc-600 border-zinc-200",
-  },
-};
+import { useTranslation } from "react-i18next";
 
 export default function ProjectStatusBadge({ status }: { status: string }) {
-  const s = MAP[status] || {
-    label: status,
-    cls: "bg-slate-50 text-slate-600 border-slate-200",
+  const { t } = useTranslation();
+
+  const key = status || "UNKNOWN";
+
+  const styles: Record<string, string> = {
+    PLANNING: "bg-muted text-mutedForeground border-border",
+    ACTIVE:
+      "bg-[hsl(var(--primary)/0.12)] text-foreground border-[hsl(var(--primary)/0.25)]",
+    COMPLETED:
+      "bg-[rgba(34,197,94,0.12)] text-foreground border-[rgba(34,197,94,0.25)]",
+    ARCHIVED: "bg-muted text-mutedForeground border-border",
+    UNKNOWN: "bg-muted text-mutedForeground border-border",
   };
+
+  const cls = styles[key] || styles.UNKNOWN;
 
   return (
     <span
-      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold border ${s.cls}`}
+      className={[
+        "inline-flex items-center px-2 py-1 rounded-full text-xs font-bold border",
+        cls,
+      ].join(" ")}
     >
-      {s.label}
+      {t(`projects.status.${key}`, { defaultValue: key })}
     </span>
   );
 }

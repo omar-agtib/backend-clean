@@ -1,5 +1,7 @@
 // src/features/plans/components/PlansPanel.tsx
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+
 import SectionCard from "../../../components/SectionCard";
 import EmptyState from "../../../components/EmptyState";
 import PlanPreview from "./PlanPreview";
@@ -13,6 +15,8 @@ import type { Plan } from "../api/plans.api";
 import CreatePlanModal from "./CreatePlanModal";
 
 export default function PlansPanel({ projectId }: { projectId: string }) {
+  const { t } = useTranslation();
+
   const plansQ = usePlans(projectId);
 
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
@@ -68,13 +72,23 @@ export default function PlansPanel({ projectId }: { projectId: string }) {
     e.target.value = "";
   }
 
-  if (plansQ.isLoading)
-    return <div className="h-40 bg-slate-200 animate-pulse rounded-2xl" />;
+  if (plansQ.isLoading) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="h-5 w-40 bg-muted rounded-xl animate-pulse" />
+        <div className="mt-4 space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-14 bg-muted rounded-2xl animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (plansQ.isError) {
     return (
       <EmptyState
-        title="Failed to load plans"
+        title={t("plans.errorTitle")}
         subtitle={
           (plansQ.error as any)?.response?.data?.message ||
           (plansQ.error as Error).message
@@ -85,68 +99,83 @@ export default function PlansPanel({ projectId }: { projectId: string }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      {/* Left column */}
       <div className="lg:col-span-2 space-y-4">
-        <SectionCard title="Plans">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-xs text-slate-500">{plans.length} plans</div>
+        {/* Plans */}
+        <SectionCard
+          title={t("plans.plansTitle")}
+          right={
             <button
               onClick={() => setCreateOpen(true)}
-              className="rounded-xl bg-slate-900 hover:bg-slate-800 px-3 py-2 text-xs font-semibold text-white"
+              className="btn-primary text-xs px-3 py-2"
               type="button"
             >
-              + New Plan
+              {t("plans.newPlan")}
             </button>
+          }
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs text-mutedForeground">
+              {t("plans.count", { n: plans.length })}
+            </div>
           </div>
 
           {plans.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-              <div className="text-sm font-semibold text-slate-900">
-                No plans yet
+            <div className="rounded-2xl border border-dashed border-border bg-muted p-6 text-center">
+              <div className="text-sm font-extrabold text-foreground">
+                {t("plans.emptyTitle")}
               </div>
-              <div className="mt-1 text-xs text-slate-600">
-                Click <span className="font-semibold">+ New Plan</span> to
-                create your first plan.
+              <div className="mt-1 text-xs text-mutedForeground">
+                {t("plans.emptySubtitle")}
               </div>
             </div>
           ) : (
             <div className="space-y-2">
-              {plans.map((p: Plan) => (
-                <button
-                  key={p._id}
-                  onClick={() => {
-                    setActivePlanId(p._id);
-                    setActiveVersionId(null);
-                  }}
-                  className={[
-                    "w-full text-left rounded-xl border px-4 py-3 transition",
-                    p._id === activePlanId
-                      ? "border-slate-900 bg-slate-50"
-                      : "border-slate-200 hover:bg-slate-50",
-                  ].join(" ")}
-                  type="button"
-                >
-                  <div className="font-semibold text-slate-900">
-                    {(p as any).name}
-                  </div>
-                  {(p as any).description ? (
-                    <div className="text-xs text-slate-500 mt-1 line-clamp-2">
-                      {(p as any).description}
+              {plans.map((p: Plan) => {
+                const isActive = p._id === activePlanId;
+                return (
+                  <button
+                    key={p._id}
+                    onClick={() => {
+                      setActivePlanId(p._id);
+                      setActiveVersionId(null);
+                    }}
+                    className={[
+                      "w-full text-left rounded-2xl border px-4 py-3 transition",
+                      "bg-card border-border hover:bg-muted",
+                      isActive ? "ring-2 ring-[hsl(var(--ring)/0.20)]" : "",
+                    ].join(" ")}
+                    type="button"
+                  >
+                    <div className="font-extrabold text-foreground">
+                      {(p as any).name}
                     </div>
-                  ) : null}
-                </button>
-              ))}
+                    {(p as any).description ? (
+                      <div className="text-xs text-mutedForeground mt-1 line-clamp-2">
+                        {(p as any).description}
+                      </div>
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
           )}
         </SectionCard>
 
-        <SectionCard title="Versions">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-xs text-slate-500">
-              {activePlanId ? "Upload a new version file" : "Select a plan"}
-            </div>
-
-            <label className="cursor-pointer rounded-xl bg-slate-900 hover:bg-slate-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60">
-              {upload.isPending ? "Uploading..." : "+ Upload"}
+        {/* Versions */}
+        <SectionCard
+          title={t("plans.versionsTitle")}
+          right={
+            <label
+              className={[
+                "cursor-pointer select-none",
+                "btn-primary text-xs px-3 py-2",
+                !activePlanId || upload.isPending
+                  ? "opacity-60 pointer-events-none"
+                  : "",
+              ].join(" ")}
+            >
+              {upload.isPending ? t("plans.uploading") : t("plans.upload")}
               <input
                 type="file"
                 className="hidden"
@@ -154,12 +183,19 @@ export default function PlansPanel({ projectId }: { projectId: string }) {
                 disabled={upload.isPending || !activePlanId}
               />
             </label>
+          }
+        >
+          <div className="mb-3 text-xs text-mutedForeground">
+            {activePlanId ? t("plans.uploadHint") : t("plans.selectPlanHint")}
           </div>
 
           {upload.isError ? (
-            <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700 mb-3">
-              {(upload.error as any)?.response?.data?.message ||
-                (upload.error as Error).message}
+            <div className="rounded-2xl border border-border bg-muted px-3 py-2 text-sm mb-3">
+              <div className="font-bold text-danger">{t("common.error")}</div>
+              <div className="text-mutedForeground mt-1 break-words">
+                {(upload.error as any)?.response?.data?.message ||
+                  (upload.error as Error).message}
+              </div>
             </div>
           ) : null}
 
@@ -168,48 +204,51 @@ export default function PlansPanel({ projectId }: { projectId: string }) {
               {Array.from({ length: 3 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-14 bg-slate-200 rounded-xl animate-pulse"
+                  className="h-14 bg-muted rounded-2xl animate-pulse"
                 />
               ))}
             </div>
           ) : versionsQ.isError ? (
-            <div className="text-sm text-red-700">
+            <div className="text-sm text-danger">
               {(versionsQ.error as any)?.response?.data?.message ||
                 (versionsQ.error as Error).message}
             </div>
           ) : versions.length === 0 ? (
-            <div className="text-sm text-slate-600">
-              No versions yet. Upload the first PDF.
+            <div className="text-sm text-mutedForeground">
+              {t("plans.noVersions")}
             </div>
           ) : (
             <div className="space-y-2">
               {[...versions]
                 .sort((a, b) => b.versionNumber - a.versionNumber)
-                .map((v) => (
-                  <button
-                    key={v._id}
-                    onClick={() => setActiveVersionId(v._id)}
-                    className={[
-                      "w-full text-left rounded-xl border px-4 py-3 transition",
-                      v._id === activeVersionId
-                        ? "border-slate-900 bg-slate-50"
-                        : "border-slate-200 hover:bg-slate-50",
-                    ].join(" ")}
-                    type="button"
-                  >
-                    <div className="font-medium text-slate-900">
-                      Version #{v.versionNumber}
-                    </div>
-                    <div className="text-xs text-slate-500 truncate mt-1">
-                      {v.file?.originalName || v.file?.publicId}
-                    </div>
-                  </button>
-                ))}
+                .map((v) => {
+                  const isActive = v._id === activeVersionId;
+                  return (
+                    <button
+                      key={v._id}
+                      onClick={() => setActiveVersionId(v._id)}
+                      className={[
+                        "w-full text-left rounded-2xl border px-4 py-3 transition",
+                        "bg-card border-border hover:bg-muted",
+                        isActive ? "ring-2 ring-[hsl(var(--ring)/0.20)]" : "",
+                      ].join(" ")}
+                      type="button"
+                    >
+                      <div className="font-extrabold text-foreground">
+                        {t("plans.versionNumber", { n: v.versionNumber })}
+                      </div>
+                      <div className="text-xs text-mutedForeground truncate mt-1">
+                        {v.file?.originalName || v.file?.publicId}
+                      </div>
+                    </button>
+                  );
+                })}
             </div>
           )}
         </SectionCard>
       </div>
 
+      {/* Right preview */}
       <div className="lg:col-span-3">
         <PlanPreview
           file={previewVersion?.file || null}
@@ -218,6 +257,7 @@ export default function PlansPanel({ projectId }: { projectId: string }) {
         />
       </div>
 
+      {/* Create modal */}
       {createOpen && (
         <CreatePlanModal
           projectId={projectId}

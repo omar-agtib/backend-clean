@@ -2,7 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
+/* -----------------------------
+   Theme tokens (CSS Variables)
+   ----------------------------- */
+:root {
+  /* Light */
+  --bg: 0 0% 99%;
+  --fg: 222 47% 11%;
+
+  --card: 0 0% 100%;
+  --card-fg: 222 47% 11%;
+
+  --muted: 220 14% 96%;
+  --muted-fg: 215 16% 47%;
+
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+
+  /* clean teal/blue primary */
+  --primary: 199 89% 48%;
+  --primary-fg: 0 0% 100%;
+
+  --ring: 199 89% 48%;
+}
+
+.dark {
+  /* Dark */
+  --bg: 222 47% 7%;
+  --fg: 210 40% 98%;
+
+  --card: 222 47% 10%;
+  --card-fg: 210 40% 98%;
+
+  --muted: 217 33% 14%;
+  --muted-fg: 215 20% 65%;
+
+  --border: 217 33% 18%;
+  --input: 217 33% 18%;
+
+  --primary: 199 89% 55%;
+  --primary-fg: 222 47% 7%;
+
+  --ring: 199 89% 55%;
+}
+
 html,
 body {
   height: 100%;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+}
+
+/* better focus for accessibility */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px hsl(var(--ring) / 0.25);
+  border-radius: 0.75rem;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-border bg-card text-cardForeground shadow-soft;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary text-primaryForeground hover:opacity-90;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent hover:bg-muted;
+  }
+
+  .btn-outline {
+    @apply btn border border-border bg-card hover:bg-muted;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-2 rounded-xl border border-border bg-muted px-3 py-1 text-xs text-mutedForeground;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-input bg-card px-3 py-2 text-sm text-foreground outline-none;
+    @apply focus:ring-4 focus:ring-[hsl(var(--ring)/0.25)];
+  }
 }

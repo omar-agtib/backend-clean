@@ -1,5 +1,6 @@
 // src/features/plans/components/PlanPreview.tsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import SectionCard from "../../../components/SectionCard";
 import { Document, Page, pdfjs } from "react-pdf";
 
@@ -32,6 +33,8 @@ export default function PlanPreview({
   file: FileInfo | null;
   planVersionId?: string | null;
 }) {
+  const { t } = useTranslation();
+
   const [numPages, setNumPages] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +79,6 @@ export default function PlanPreview({
 
   // ✅ callback ref: always measure when element mounts
   const setPageWrapRef = useCallback((node: HTMLDivElement | null) => {
-    // cleanup old observer
     if (resizeObsRef.current) {
       resizeObsRef.current.disconnect();
       resizeObsRef.current = null;
@@ -89,15 +91,11 @@ export default function PlanPreview({
       return;
     }
 
-    const updateRect = () => {
-      setRect(node.getBoundingClientRect());
-    };
+    const updateRect = () => setRect(node.getBoundingClientRect());
 
-    // measure now + after paint (PDF renders async)
     updateRect();
     requestAnimationFrame(updateRect);
 
-    // observe size changes
     const ro = new ResizeObserver(() => updateRect());
     ro.observe(node);
     resizeObsRef.current = ro;
@@ -124,9 +122,11 @@ export default function PlanPreview({
   }, [page, url]);
 
   const title = useMemo(() => {
-    if (!file) return "Preview";
-    return file.originalName || file.publicId || "Preview";
-  }, [file]);
+    if (!file) return t("plans.preview.titleFallback");
+    return (
+      file.originalName || file.publicId || t("plans.preview.titleFallback")
+    );
+  }, [file, t]);
 
   async function placePin(e: React.MouseEvent) {
     if (!pinMode) return;
@@ -178,101 +178,111 @@ export default function PlanPreview({
 
   if (!file) {
     return (
-      <SectionCard title="Preview">
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
-          <div className="text-lg font-semibold text-slate-900">
-            No version selected
+      <SectionCard title={t("plans.preview.titleFallback")}>
+        <div className="rounded-2xl border border-dashed border-border bg-muted p-8 text-center">
+          <div className="text-lg font-extrabold text-foreground">
+            {t("plans.preview.noVersionTitle")}
           </div>
-          <div className="mt-1 text-sm text-slate-600">
-            Choose a plan version to preview the PDF.
+          <div className="mt-1 text-sm text-mutedForeground">
+            {t("plans.preview.noVersionSubtitle")}
           </div>
         </div>
       </SectionCard>
     );
   }
 
-  const tip =
-    "Tip: Right click pin to delete · Hold Shift and drag pin to move";
+  const tip = t("plans.preview.tip");
 
   return (
     <SectionCard title={title}>
       {/* Top actions */}
-      <div className="mb-3 space-y-2">
+      <div className="mb-4 space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm text-slate-600">
+          <div className="text-sm text-mutedForeground">
             {numPages ? (
               <>
-                Page{" "}
-                <span className="font-semibold text-slate-900">{page}</span> /{" "}
-                <span className="font-semibold text-slate-900">{numPages}</span>
+                {t("plans.preview.page")}{" "}
+                <span className="font-semibold text-foreground">{page}</span> /{" "}
+                <span className="font-semibold text-foreground">
+                  {numPages}
+                </span>
                 {pinMode ? (
-                  <span className="ml-3 inline-flex items-center rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
-                    Click on PDF to place pin
+                  <span className="ml-3 inline-flex items-center rounded-full bg-[hsl(var(--primary))] px-2.5 py-1 text-xs font-extrabold text-white">
+                    {t("plans.preview.pinMode")}
                   </span>
                 ) : null}
               </>
             ) : (
-              "Loading document..."
+              t("plans.preview.loadingDoc")
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
-              className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold hover:bg-slate-200 disabled:opacity-50"
+              className="btn-outline text-sm px-3 py-2 disabled:opacity-50"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={!numPages || page <= 1}
               type="button"
             >
-              Prev
+              {t("common.prev")}
             </button>
 
             <button
-              className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold hover:bg-slate-200 disabled:opacity-50"
+              className="btn-outline text-sm px-3 py-2 disabled:opacity-50"
               onClick={() => setPage((p) => Math.min(numPages, p + 1))}
               disabled={!numPages || page >= numPages}
               type="button"
             >
-              Next
+              {t("common.next")}
             </button>
 
             <button
-              className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60"
+              className="btn-primary text-sm px-3 py-2 disabled:opacity-60"
               type="button"
               disabled={!planVersionId || create.isPending}
               onClick={() => setPinMode((v) => !v)}
-              title={!planVersionId ? "Select a version first" : "Add pin"}
+              title={
+                !planVersionId
+                  ? t("plans.preview.selectVersionFirst")
+                  : t("plans.preview.addPin")
+              }
             >
-              {pinMode ? "Cancel Pin" : "+ Pin"}
+              {pinMode ? t("plans.preview.cancelPin") : t("plans.preview.pin")}
             </button>
 
             <a
               href={file.url}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white"
+              className="btn-primary text-sm px-3 py-2"
             >
-              Open PDF
+              {t("plans.preview.openPdf")}
             </a>
           </div>
         </div>
 
-        {/* Tip shown at top */}
-        <div className="text-xs text-slate-500">{tip}</div>
+        {/* Tip */}
+        <div className="text-xs text-mutedForeground">{tip}</div>
       </div>
 
       {/* Viewer area */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
         {error ? (
-          <div className="p-6 text-sm text-red-700">
-            Failed to render PDF: {error}
-            <div className="mt-2">
+          <div className="p-6 text-sm">
+            <div className="font-bold text-danger">
+              {t("plans.preview.renderErrorTitle")}
+            </div>
+            <div className="mt-1 text-mutedForeground">
+              {t("plans.preview.renderErrorBody")} {error}
+            </div>
+            <div className="mt-3">
               <a
                 href={file.url}
                 target="_blank"
                 rel="noreferrer"
                 className="underline"
               >
-                Open the PDF in a new tab
+                {t("plans.preview.openInNewTab")}
               </a>
             </div>
           </div>
@@ -291,7 +301,6 @@ export default function PlanPreview({
                 onLoadSuccess={(r) => {
                   setNumPages(r.numPages);
                   setPage(1);
-                  // measure after doc load
                   requestAnimationFrame(() => {
                     const el = pageWrapElRef.current;
                     if (el) setRect(el.getBoundingClientRect());
@@ -301,7 +310,7 @@ export default function PlanPreview({
                   setError(e?.message || "Unknown error")
                 }
                 loading={
-                  <div className="h-80 animate-pulse rounded-2xl bg-slate-200" />
+                  <div className="h-80 animate-pulse rounded-2xl bg-muted" />
                 }
               >
                 <Page

@@ -11,6 +11,7 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+import { useTranslation } from "react-i18next";
 
 import EmptyState from "../components/EmptyState";
 import KpiCard from "../components/KpiCard";
@@ -28,39 +29,37 @@ function money(n: number) {
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const setActiveProject = useProjectStore((s) => s.setActiveProject);
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
 
   const q = useDashboardOverview();
-
   const [search, setSearch] = useState("");
 
   const filteredProjects = useMemo(() => {
     const list = q.data?.projects || [];
     const s = search.trim().toLowerCase();
     if (!s) return list;
-
     return list.filter((p) => (p.name || "").toLowerCase().includes(s));
   }, [q.data?.projects, search]);
 
   if (q.isLoading) {
     return (
       <div className="space-y-4">
-        <div className="h-10 w-64 rounded-xl bg-slate-200 animate-pulse" />
+        <div className="card p-5">
+          <div className="h-6 w-48 bg-muted rounded-xl animate-pulse" />
+          <div className="mt-3 h-4 w-72 bg-muted rounded-xl animate-pulse" />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-24 rounded-2xl bg-slate-200 animate-pulse"
-            />
+            <div key={i} className="card p-4">
+              <div className="h-4 w-24 bg-muted rounded-xl animate-pulse" />
+              <div className="mt-3 h-7 w-16 bg-muted rounded-xl animate-pulse" />
+              <div className="mt-2 h-3 w-28 bg-muted rounded-xl animate-pulse" />
+            </div>
           ))}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="h-80 rounded-2xl bg-slate-200 animate-pulse" />
-          <div className="h-80 rounded-2xl bg-slate-200 animate-pulse" />
-        </div>
-        <div className="h-80 rounded-2xl bg-slate-200 animate-pulse" />
       </div>
     );
   }
@@ -68,17 +67,11 @@ export default function DashboardPage() {
   if (q.isError) {
     return (
       <EmptyState
-        title="Dashboard failed"
-        subtitle={
-          (q.error as any)?.response?.data?.message ||
-          (q.error as Error).message
-        }
+        title={t("dashboard.errorTitle")}
+        subtitle={t("dashboard.errorSubtitle")}
         action={
-          <button
-            onClick={() => q.refetch()}
-            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-          >
-            Retry
+          <button onClick={() => q.refetch()} className="btn-primary">
+            {t("common.retry")}
           </button>
         }
       />
@@ -91,14 +84,11 @@ export default function DashboardPage() {
   if (totals.projects === 0) {
     return (
       <EmptyState
-        title="No projects yet"
-        subtitle="Create your first project to start tracking progress, stock, tools, and billing."
+        title={t("dashboard.noProjectsTitle")}
+        subtitle={t("dashboard.noProjectsSubtitle")}
         action={
-          <Link
-            to="/app/projects"
-            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-          >
-            Go to Projects
+          <Link to="/app/projects" className="btn-primary">
+            {t("dashboard.goToProjects")}
           </Link>
         }
       />
@@ -106,9 +96,9 @@ export default function DashboardPage() {
   }
 
   const pieNc = [
-    { name: "Open", value: totals.ncOpen },
-    { name: "In Progress", value: totals.ncInProgress },
-    { name: "Validated", value: totals.ncValidated },
+    { name: t("dashboard.ncOpen"), value: totals.ncOpen },
+    { name: t("dashboard.ncInProgress"), value: totals.ncInProgress },
+    { name: t("dashboard.ncValidated"), value: totals.ncValidated },
   ];
 
   const barInvoices = Object.entries(data.invoicesByStatus).map(
@@ -119,55 +109,62 @@ export default function DashboardPage() {
     })
   );
 
+  const totalInvoiced = Object.values(data.invoicesByStatus).reduce(
+    (sum, r) => sum + (r.totalAmount || 0),
+    0
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-900">Dashboard</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Global overview ·{" "}
-            <span className="font-medium text-slate-900">
-              {totals.projects} project{totals.projects === 1 ? "" : "s"}
+        <div className="min-w-0">
+          <h1 className="text-2xl font-extrabold">{t("dashboard.title")}</h1>
+          <p className="text-sm text-mutedForeground mt-1">
+            {t("dashboard.overview")} ·{" "}
+            <span className="font-semibold text-foreground">
+              {totals.projects}{" "}
+              {t(
+                totals.projects === 1
+                  ? "dashboard.project"
+                  : "dashboard.projects"
+              )}
             </span>
           </p>
         </div>
 
-        <Link
-          to="/app/projects"
-          className="rounded-xl bg-slate-100 hover:bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-900"
-        >
-          Manage Projects
+        <Link to="/app/projects" className="btn-outline">
+          {t("dashboard.manageProjects")}
         </Link>
       </div>
 
       {/* Global KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <KpiCard
-          label="NC Total"
+          label={t("dashboard.kpiNcTotal")}
           value={totals.ncTotal}
-          hint={`Open: ${totals.ncOpen}`}
+          hint={`${t("dashboard.ncOpen")}: ${totals.ncOpen}`}
         />
         <KpiCard
-          label="Stock Qty"
+          label={t("dashboard.kpiStockQty")}
           value={totals.stockTotalQty}
-          hint="Total quantity"
+          hint={t("dashboard.kpiStockHint")}
         />
         <KpiCard
-          label="Tools Assigned"
+          label={t("dashboard.kpiToolsAssigned")}
           value={totals.toolsAssigned}
-          hint="Active assignments"
+          hint={t("dashboard.kpiToolsHint")}
         />
         <KpiCard
-          label="Invoices Paid"
+          label={t("dashboard.kpiInvoicesPaid")}
           value={totals.invoicesPaid}
-          hint={`Total: ${totals.invoicesTotal}`}
+          hint={`${t("dashboard.kpiInvoicesTotal")}: ${totals.invoicesTotal}`}
         />
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SectionCard title="Non-Conformities (Global Status)">
+        <SectionCard title={t("dashboard.chartNcTitle")}>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -183,7 +180,7 @@ export default function DashboardPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Invoices by Status (Global Amount)">
+        <SectionCard title={t("dashboard.chartInvoicesTitle")}>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barInvoices}>
@@ -199,38 +196,33 @@ export default function DashboardPage() {
       </div>
 
       {/* Global Milestones */}
-      <SectionCard title="Milestones (Global Progress)">
+      <SectionCard title={t("dashboard.milestonesTitle")}>
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="text-sm text-slate-700">
-            Completed:{" "}
-            <span className="font-semibold text-slate-900">
+          <div className="text-sm text-mutedForeground">
+            {t("dashboard.completed")}{" "}
+            <span className="font-semibold text-foreground">
               {totals.milestonesCompleted}/{totals.milestonesTotal}
             </span>
           </div>
 
-          <div className="text-sm text-slate-700">
-            Rate:{" "}
-            <span className="font-semibold text-slate-900">
+          <div className="text-sm text-mutedForeground">
+            {t("dashboard.rate")}{" "}
+            <span className="font-semibold text-foreground">
               {totals.milestonesCompletionRate}%
             </span>
           </div>
 
-          <div className="text-sm text-slate-700">
-            Total invoiced:{" "}
-            <span className="font-semibold text-slate-900">
-              {money(
-                Object.values(data.invoicesByStatus).reduce(
-                  (sum, r) => sum + (r.totalAmount || 0),
-                  0
-                )
-              )}
+          <div className="text-sm text-mutedForeground">
+            {t("dashboard.totalInvoiced")}{" "}
+            <span className="font-semibold text-foreground">
+              {money(totalInvoiced)}
             </span>
           </div>
         </div>
 
-        <div className="mt-3 h-3 w-full rounded-full bg-slate-100 overflow-hidden">
+        <div className="mt-4 h-3 w-full rounded-full bg-muted overflow-hidden">
           <div
-            className="h-full bg-slate-900"
+            className="h-full bg-primary"
             style={{ width: `${totals.milestonesCompletionRate}%` }}
           />
         </div>
@@ -238,121 +230,120 @@ export default function DashboardPage() {
 
       {/* Projects List */}
       <SectionCard
-        title="Projects"
+        title={t("dashboard.projectsTitle")}
         right={
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search projects..."
-            className="w-72 max-w-[55vw] rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+            placeholder={t("dashboard.searchPlaceholder")}
+            className="input w-72 max-w-[55vw]"
           />
         }
       >
         {filteredProjects.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-            <div className="text-sm font-semibold text-slate-900">
-              No projects found
+          <div className="rounded-2xl border border-dashed border-border bg-muted p-6 text-center">
+            <div className="text-sm font-extrabold">
+              {t("dashboard.noResultsTitle")}
             </div>
-            <div className="mt-1 text-xs text-slate-600">
-              Try a different search.
+            <div className="mt-1 text-xs text-mutedForeground">
+              {t("dashboard.noResultsSubtitle")}
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-4">
             {filteredProjects.map((p) => {
               const isActive = activeProjectId === p._id;
 
               return (
-                <div
-                  key={p._id}
-                  className={[
-                    "rounded-2xl border bg-white p-4",
-                    isActive ? "border-slate-900" : "border-slate-200",
-                  ].join(" ")}
-                >
+                <div key={p._id} className="card p-5">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div>
-                      <div className="text-base font-extrabold text-slate-900">
-                        {p.name}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-lg font-extrabold truncate">
+                          {p.name}
+                        </h3>
                         {isActive ? (
-                          <span className="ml-2 inline-flex items-center rounded-full bg-slate-900 px-2 py-0.5 text-xs font-bold text-white">
-                            ACTIVE
-                          </span>
+                          <span className="chip">{t("dashboard.active")}</span>
                         ) : null}
+                        <span className="chip">{p.status}</span>
                       </div>
-                      <div className="mt-1 text-sm text-slate-600">
-                        Status:{" "}
-                        <span className="font-semibold text-slate-900">
-                          {p.status}
-                        </span>
+
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="btn-outline"
+                          onClick={() =>
+                            navigate(`/app/projects/${p._id}?tab=plans`)
+                          }
+                        >
+                          {t("dashboard.openWorkspace")}
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={() => {
+                            setActiveProject({ id: p._id, name: p.name });
+                            navigate(`/app/projects/${p._id}?tab=plans`);
+                          }}
+                        >
+                          {t("dashboard.setActive")}
+                        </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="rounded-xl bg-slate-100 hover:bg-slate-200 px-3 py-2 text-xs font-semibold text-slate-900"
-                        onClick={() =>
-                          navigate(`/app/projects/${p._id}?tab=plans`)
-                        }
-                      >
-                        Open Workspace
-                      </button>
-
-                      <button
-                        type="button"
-                        className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white"
-                        onClick={() => {
-                          setActiveProject({ id: p._id, name: p.name });
-                          navigate(`/app/projects/${p._id}?tab=plans`);
-                        }}
-                      >
-                        Set Active
-                      </button>
+                    <div className="min-w-[240px]">
+                      <div className="text-xs text-mutedForeground">
+                        {t("dashboard.progress")}
+                      </div>
+                      <div className="mt-2 h-2 w-full rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full bg-primary"
+                          style={{ width: `${p.milestones.completionRate}%` }}
+                        />
+                      </div>
+                      <div className="mt-2 text-xs text-mutedForeground">
+                        <span className="font-semibold text-foreground">
+                          {p.milestones.completed}/{p.milestones.total}
+                        </span>{" "}
+                        · {p.milestones.completionRate}%
+                      </div>
                     </div>
                   </div>
 
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div className="rounded-2xl border border-slate-200 p-3">
-                      <div className="text-xs font-semibold text-slate-500">
-                        Progress
+                    <div className="rounded-2xl border border-border p-3">
+                      <div className="text-xs font-semibold text-mutedForeground">
+                        {t("dashboard.cardNcOpen")}
                       </div>
-                      <div className="mt-1 text-xl font-extrabold text-slate-900">
-                        {p.milestones.completionRate}%
-                      </div>
-                      <div className="mt-2 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                        <div
-                          className="h-full bg-slate-900"
-                          style={{
-                            width: `${p.milestones.completionRate}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-200 p-3">
-                      <div className="text-xs font-semibold text-slate-500">
-                        NC Open
-                      </div>
-                      <div className="mt-1 text-xl font-extrabold text-slate-900">
+                      <div className="mt-1 text-xl font-extrabold">
                         {p.nc.open}
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-200 p-3">
-                      <div className="text-xs font-semibold text-slate-500">
-                        Stock Qty
+                    <div className="rounded-2xl border border-border p-3">
+                      <div className="text-xs font-semibold text-mutedForeground">
+                        {t("dashboard.cardStockQty")}
                       </div>
-                      <div className="mt-1 text-xl font-extrabold text-slate-900">
+                      <div className="mt-1 text-xl font-extrabold">
                         {p.stock.totalQty}
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-200 p-3">
-                      <div className="text-xs font-semibold text-slate-500">
-                        Tools Assigned
+                    <div className="rounded-2xl border border-border p-3">
+                      <div className="text-xs font-semibold text-mutedForeground">
+                        {t("dashboard.cardInvoicesPaid")}
                       </div>
-                      <div className="mt-1 text-xl font-extrabold text-slate-900">
+                      <div className="mt-1 text-xl font-extrabold">
+                        {p.invoices.paid}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-border p-3">
+                      <div className="text-xs font-semibold text-mutedForeground">
+                        {t("dashboard.cardToolsAssigned")}
+                      </div>
+                      <div className="mt-1 text-xl font-extrabold">
                         {p.tools.assigned}
                       </div>
                     </div>
