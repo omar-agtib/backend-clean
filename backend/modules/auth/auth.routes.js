@@ -1,3 +1,4 @@
+// backend/modules/auth/auth.routes.js
 const router = require("express").Router();
 const ctrl = require("./auth.controller");
 const auth = require("../../middlewares/auth");

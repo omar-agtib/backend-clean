@@ -16,22 +16,17 @@ export default function AppRoutes() {
       <Route path="/" element={<BootPage />} />
       <Route path="/login" element={<LoginPage />} />
 
-      {/* ✅ Protected area */}
       <Route element={<RequireAuth />}>
         <Route path="/app" element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
-
-          {/* Projects */}
           <Route path="projects" element={<ProjectsPage />} />
           <Route
             path="projects/:projectId"
             element={<ProjectWorkspacePage />}
           />
-
-          {/* Notifications */}
           <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="search" element={<SearchPage />} />
 
-          {/* ✅ Option A: Stock/Tools/Billing ONLY inside project workspace tabs */}
           <Route
             path="stock"
             element={<Navigate to="/app/projects" replace />}
@@ -44,8 +39,6 @@ export default function AppRoutes() {
             path="billing"
             element={<Navigate to="/app/projects" replace />}
           />
-
-          <Route path="search" element={<SearchPage />} />
         </Route>
       </Route>
 
