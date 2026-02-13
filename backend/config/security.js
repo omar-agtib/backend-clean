@@ -1,7 +1,7 @@
 // backend/config/security.js
 const IS_PROD = process.env.NODE_ENV === "production";
 
-const devOrigin = "http://localhost:5173";
+const devOrigin = "http://localhost:3000";
 
 const prodOrigins = (process.env.CORS_ORIGIN || "")
   .split(",")

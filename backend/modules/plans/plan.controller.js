@@ -21,7 +21,7 @@ exports.listVersions = asyncHandler(async (req, res) => {
 exports.uploadVersion = asyncHandler(async (req, res) => {
   if (!req.file?.buffer) {
     const err = new Error(
-      'No file uploaded. Use form-data key "file" (type File).'
+      'No file uploaded. Use form-data key "file" (type File).',
     );
     err.status = 400;
     throw err;
@@ -42,7 +42,7 @@ exports.uploadVersion = asyncHandler(async (req, res) => {
       resourceType: uploaded.resourceType,
       originalName: req.file.originalname,
     },
-    req.user.id
+    req.user.id,
   );
 
   res.status(201).json(version);
@@ -66,19 +66,28 @@ exports.setCurrentVersion = asyncHandler(async (req, res) => {
 exports.signedUrl = asyncHandler(async (req, res) => {
   let expiresInSec = Number(req.query.expiresInSec || 3600);
 
-  // ✅ sanitize expires
   if (Number.isNaN(expiresInSec) || expiresInSec <= 0) {
     const err = new Error("expiresInSec must be a positive number");
     err.status = 400;
     throw err;
   }
 
-  // ✅ cap to avoid abuse
-  expiresInSec = Math.min(expiresInSec, 24 * 3600); // max 24h
+  expiresInSec = Math.min(expiresInSec, 24 * 3600);
+
+  // 🔍 DEBUG: Log version data
+  console.log("🔍 Version data:", JSON.stringify(req.planVersion, null, 2));
 
   const result = await service.getVersionSignedUrl(
     req.planVersion,
-    expiresInSec
+    expiresInSec,
   );
+
+  // 🔍 DEBUG: Log generated URL
+  console.log("🔍 Generated URL:", result.url);
+
   res.json(result);
+});
+
+exports.getOne = asyncHandler(async (req, res) => {
+  res.json(req.plan); // planAccess middleware already loaded it
 });

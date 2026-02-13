@@ -1,0 +1,277 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -----------------------------
+   Theme tokens (CSS Variables)
+   Enterprise-Grade Color Palette
+   Inspired by Jira & ClickUp
+   ----------------------------- */
+:root {
+  /* Light Mode - Clean Enterprise */
+  --bg: 0 0% 100%;
+  --fg: 210 16% 11%;
+  
+  --card: 210 18% 97%;
+  --card-fg: 210 16% 11%;
+  
+  --muted: 210 14% 92%;
+  --muted-fg: 210 12% 44%;
+  
+  --border: 210 15% 88%;
+  --input: 210 15% 88%;
+  
+  --overlay: 0 0% 0%;
+  --overlay-bg: 0 0% 0%;
+  
+  /* Primary Blue - Professional, accessible */
+  --primary: 213 100% 50%;
+  --primary-fg: 0 0% 100%;
+  --primary-hover: 213 100% 45%;
+  --primary-active: 213 100% 40%;
+  
+  /* Secondary: Slate for subtlety */
+  --secondary: 210 13% 50%;
+  
+  /* Semantic Colors */
+  --success: 142 71% 45%;
+  --warning: 38 92% 50%;
+  --error: 0 84% 60%;
+  --info: 213 96% 54%;
+  
+  --ring: 213 100% 50%;
+}
+
+.dark {
+  /* Dark Mode - Modern enterprise */
+  --bg: 210 20% 8%;
+  --fg: 210 16% 95%;
+  
+  --card: 210 20% 12%;
+  --card-fg: 210 16% 95%;
+  
+  --muted: 210 14% 20%;
+  --muted-fg: 210 12% 60%;
+  
+  --border: 210 15% 28%;
+  --input: 210 15% 28%;
+  
+  --overlay: 0 0% 0%;
+  --overlay-bg: 0 0% 0%;
+  
+  /* Primary Blue - Adjusted for dark mode contrast */
+  --primary: 213 100% 56%;
+  --primary-fg: 210 20% 8%;
+  --primary-hover: 213 100% 50%;
+  --primary-active: 213 100% 45%;
+  
+  /* Secondary: Slate lighter for dark mode */
+  --secondary: 210 13% 65%;
+  
+  /* Semantic Colors - Adjusted for dark mode */
+  --success: 142 71% 52%;
+  --warning: 38 92% 58%;
+  --error: 0 84% 68%;
+  --info: 213 96% 62%;
+  
+  --ring: 213 100% 56%;
+}
+
+/* Responsive font sizing using clamp */
+html {
+  font-size: clamp(14px, 2vw, 16px);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  @apply bg-background text-foreground antialiased overflow-x-hidden;
+}
+
+/* Enterprise focus styling */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.2);
+  border-radius: 0.5rem;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Remove tap highlight on mobile */
+body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer components {
+  /* Enterprise Card Component */
+  .card {
+    @apply rounded-lg border border-border bg-card text-card-fg shadow-sm transition-all duration-200;
+  }
+
+  .card-hover {
+    @apply hover:shadow-md hover:border-primary/30;
+  }
+
+  /* Button System - Enterprise Grade */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all duration-200;
+    @apply disabled:opacity-60 disabled:cursor-not-allowed disabled:pointer-events-none;
+    @apply active:scale-95;
+    /* Mobile: 44px minimum height for touch targets */
+    @apply h-10 min-h-[44px];
+    @apply sm:min-h-10;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary text-primary-fg;
+    @apply hover:bg-[hsl(var(--primary-hover))] active:bg-[hsl(var(--primary-active))];
+  }
+
+  .btn-secondary {
+    @apply btn bg-muted text-muted-fg;
+    @apply hover:bg-[hsl(210_14%_85%)] dark:hover:bg-[hsl(210_14%_25%)];
+  }
+
+  .btn-outline {
+    @apply btn border border-border bg-transparent text-foreground;
+    @apply hover:bg-muted hover:border-muted-fg;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-foreground;
+    @apply hover:bg-muted;
+  }
+
+  .btn-danger {
+    @apply btn bg-error text-white;
+    @apply hover:bg-[hsl(var(--error)_/_0.9)];
+  }
+
+  .btn-success {
+    @apply btn bg-success text-white;
+    @apply hover:bg-[hsl(var(--success)_/_0.9)];
+  }
+
+  /* Input Components - Mobile Optimized */
+  .input {
+    @apply w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground placeholder-muted-fg outline-none;
+    @apply transition-colors duration-200;
+    @apply focus:border-primary focus:ring-1 focus:ring-primary/30;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    /* Mobile: 16px font to prevent zoom, 44px height */
+    @apply text-base h-11;
+    @apply sm:text-sm sm:h-10;
+  }
+
+  .input-lg {
+    @apply text-base px-4 py-3 h-12 sm:h-11;
+  }
+
+  .textarea {
+    @apply input min-h-[100px] resize-none;
+  }
+
+  /* Label Styling */
+  .label {
+    @apply block text-sm font-medium text-foreground mb-2;
+  }
+
+  .label-required::after {
+    @apply content-['*'] ml-1 text-error;
+  }
+
+  /* Badge System */
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap;
+  }
+
+  .badge-primary {
+    @apply badge bg-primary/15 text-primary dark:bg-primary/20;
+  }
+
+  .badge-secondary {
+    @apply badge bg-muted text-muted-fg;
+  }
+
+  .badge-success {
+    @apply badge bg-success/15 text-success dark:bg-success/20;
+  }
+
+  .badge-warning {
+    @apply badge bg-warning/15 text-warning dark:bg-warning/20;
+  }
+
+  .badge-error {
+    @apply badge bg-error/15 text-error dark:bg-error/20;
+  }
+
+  /* Form Helpers */
+  .form-error {
+    @apply text-xs text-error mt-1 block;
+  }
+
+  .form-hint {
+    @apply text-xs text-muted-fg mt-1 block;
+  }
+
+  /* Divider */
+  .divider {
+    @apply border-t border-border;
+  }
+
+  /* Responsive Padding System */
+  .p-responsive {
+    @apply p-3 sm:p-4 lg:p-6;
+  }
+
+  .px-responsive {
+    @apply px-3 sm:px-4 lg:px-6;
+  }
+
+  .py-responsive {
+    @apply py-3 sm:py-4 lg:py-6;
+  }
+
+  /* Responsive Gap System */
+  .gap-responsive {
+    @apply gap-2 sm:gap-3 lg:gap-4;
+  }
+
+  /* Page Container */
+  .page-container {
+    @apply mx-auto w-full px-3 sm:px-4 lg:px-6;
+    @apply max-w-7xl;
+  }
+
+  /* Section Spacing */
+  .section {
+    @apply space-y-4 sm:space-y-6 lg:space-y-8;
+  }
+
+  /* Enterprise Typography */
+  .h1 {
+    @apply text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight;
+  }
+
+  .h2 {
+    @apply text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight;
+  }
+
+  .h3 {
+    @apply text-lg sm:text-xl font-semibold tracking-tight;
+  }
+
+  .text-muted {
+    @apply text-muted-fg;
+  }
+}

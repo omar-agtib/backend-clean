@@ -5,15 +5,21 @@ cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true,
 });
 
 async function uploadBuffer(
   buffer,
-  { folder, filename, resourceType = "auto" }
+  { folder, filename, resourceType = "auto" },
 ) {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder, public_id: filename, resource_type: resourceType },
+      {
+        folder,
+        public_id: filename,
+        resource_type: resourceType,
+        // Currently uploads as public (type: "upload" is default)
+      },
       (error, result) => {
         if (error) return reject(error);
         resolve({
@@ -22,7 +28,7 @@ async function uploadBuffer(
           resourceType: result.resource_type,
           bytes: result.bytes,
         });
-      }
+      },
     );
     stream.end(buffer);
   });
@@ -30,29 +36,30 @@ async function uploadBuffer(
 
 async function deleteByPublicId(publicId, resourceType = "raw") {
   if (!publicId) return { result: "skipped" };
-  return cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+  return cloudinary.uploader.destroy(publicId, {
+    resource_type: resourceType,
+  });
 }
 
 /**
- * ✅ Signed URL (works best if you upload as type: "authenticated")
- * If your assets are public, you don't NEED signed URLs.
+ * ✅ FIXED: Generate signed URL for PUBLIC files
  */
 function getSignedUrl(
   publicId,
-  { resourceType = "raw", expiresInSec = 3600 } = {}
+  { resourceType = "raw", expiresInSec = 3600 } = {},
 ) {
   if (!publicId) return null;
 
   const expiresAt =
     Math.floor(Date.now() / 1000) + Number(expiresInSec || 3600);
 
-  // If you want real protection, upload with: type: "authenticated"
-  // and use: type: "authenticated" here.
+  // ✅ Use type: "upload" to match how files were uploaded
   return cloudinary.url(publicId, {
     resource_type: resourceType,
-    type: "authenticated",
+    type: "upload", // ✅ Changed from "authenticated" to "upload"
     sign_url: true,
     expires_at: expiresAt,
+    secure: true,
   });
 }
 

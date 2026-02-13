@@ -1,4 +1,3 @@
-// modules/plans/plan.routes.js
 const router = require("express").Router();
 
 const auth = require("../../middlewares/auth");
@@ -29,7 +28,7 @@ router.delete(
   "/versions/:versionId",
   auth,
   planVersionAccess(["PROJECT_MANAGER"]),
-  ctrl.deleteVersion
+  ctrl.deleteVersion,
 );
 
 // Restore version (must be able to load deleted docs)
@@ -37,7 +36,7 @@ router.post(
   "/versions/:versionId/restore",
   auth,
   planVersionAccess(["PROJECT_MANAGER"], { includeDeleted: true }),
-  ctrl.restoreVersion
+  ctrl.restoreVersion,
 );
 
 // Rollback / set as current
@@ -45,20 +44,23 @@ router.post(
   "/versions/:versionId/set-current",
   auth,
   planVersionAccess(["PROJECT_MANAGER"]),
-  ctrl.setCurrentVersion
+  ctrl.setCurrentVersion,
 );
 
 // Signed URL (secure download) — choose who can access it
 router.get(
   "/versions/:versionId/signed-url",
   auth,
-  planVersionAccess(["PROJECT_MANAGER", "TEAM_LEADER", "QUALITY"]), // tighten/loosen as you want
-  ctrl.signedUrl
+  planVersionAccess(["PROJECT_MANAGER", "TEAM_LEADER", "QUALITY"]),
+  ctrl.signedUrl,
 );
 
 /**
  * Plan-specific routes
  */
+
+// ✅ ADD THIS - Get single plan
+router.get("/:planId", auth, planAccess(), ctrl.getOne);
 
 // List versions of a plan
 router.get("/:planId/versions", auth, planAccess(), ctrl.listVersions);
@@ -69,7 +71,7 @@ router.post(
   auth,
   planAccess(["PROJECT_MANAGER"]),
   upload.single("file"),
-  ctrl.uploadVersion
+  ctrl.uploadVersion,
 );
 
 module.exports = router;

@@ -7,13 +7,30 @@ exports.create = asyncHandler(async (req, res) => {
   res.status(201).json(project);
 });
 
+// ✅ UPDATED: Return paginated response
 exports.listMine = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+
   const projects = await service.listProjectsForUser(req.user.id);
-  res.json(projects);
+
+  // Calculate pagination
+  const total = projects.length;
+  const totalPages = Math.ceil(total / limit);
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  const items = projects.slice(startIndex, endIndex);
+
+  res.json({
+    items,
+    total,
+    page,
+    pageSize: limit,
+    totalPages,
+  });
 });
 
 exports.getOne = asyncHandler(async (req, res) => {
-  // projectAccess already loaded req.project, so just return it
   res.json(req.project);
 });
 
@@ -21,7 +38,7 @@ exports.update = asyncHandler(async (req, res) => {
   const updated = await service.updateProject(
     req.project,
     req.body,
-    req.user.id
+    req.user.id,
   );
   res.json(updated);
 });
