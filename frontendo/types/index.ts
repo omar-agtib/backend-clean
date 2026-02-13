@@ -176,22 +176,53 @@ export interface BillingRule {
 }
 
 // Non-Conformity Types
+// export interface NonConformity {
+//   _id: string;
+//   projectId: string;
+//   title: string;
+//   description?: string;
+//   severity: "low" | "medium" | "high" | "critical";
+//   status: "OPEN" | "IN_PROGRESS" | "VALIDATED" | "CLOSED";
+//   assignedTo?: string;
+//   reportedBy: string;
+//   reportedDate: string;
+//   resolvedDate?: string;
+//   closedDate?: string;
+//   rootCause?: string;
+//   correctionAction?: string;
+//   preventiveAction?: string;
+//   history?: NCHistory[];
+//   createdAt: string;
+//   updatedAt: string;
+// }
+
+// export interface NCHistory {
+//   _id: string;
+//   ncId: string;
+//   status: string;
+//   changeDate: string;
+//   changedBy: string;
+//   notes?: string;
+//   attachments?: string[];
+// }
+
 export interface NonConformity {
   _id: string;
   projectId: string;
   title: string;
-  description?: string;
-  severity: "low" | "medium" | "high" | "critical";
-  status: "OPEN" | "IN_PROGRESS" | "VALIDATED" | "CLOSED";
-  assignedTo?: string;
-  reportedBy: string;
-  reportedDate: string;
-  resolvedDate?: string;
-  closedDate?: string;
-  rootCause?: string;
-  correctionAction?: string;
-  preventiveAction?: string;
-  history?: NCHistory[];
+  description: string;
+  status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "VALIDATED";
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  assignedTo?: string | User;
+  planId?: string;
+  planVersionId?: string;
+  annotationId?: string;
+  attachments: string[];
+  createdBy: string | User;
+  updatedBy?: string | User;
+  isDeleted: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -199,11 +230,13 @@ export interface NonConformity {
 export interface NCHistory {
   _id: string;
   ncId: string;
-  status: string;
-  changeDate: string;
-  changedBy: string;
-  notes?: string;
-  attachments?: string[];
+  action: "CREATED" | "ASSIGNED" | "STATUS_CHANGED" | "VALIDATED";
+  fromStatus?: string;
+  toStatus?: string;
+  userId: string | User;
+  comment?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Plan {

@@ -1,75 +1,99 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { progressApi } from '@/lib/api/progress'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { progressApi } from "@/lib/api/progress";
+import { uiStore } from "@/store/ui-store";
 
-export const useProgress = (projectId: string) => {
+export const useSummary = (projectId: string) => {
   return useQuery({
-    queryKey: ['progress', projectId],
-    queryFn: () => progressApi.getProgress(projectId),
+    queryKey: ["progress-summary", projectId],
+    queryFn: () => progressApi.getSummary(projectId),
     enabled: !!projectId,
-  })
-}
+  });
+};
 
-export const useUpdateProgress = () => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ projectId, data }: { projectId: string; data: any }) =>
-      progressApi.updateProgress(projectId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['progress', variables.projectId] })
-    },
-  })
-}
-
-export const useMilestones = (projectId: string, params?: Record<string, any>) => {
+export const useMilestones = (projectId: string) => {
   return useQuery({
-    queryKey: ['milestones', projectId, params],
-    queryFn: () => progressApi.getMilestones(projectId, params),
+    queryKey: ["milestones", projectId],
+    queryFn: () => progressApi.getMilestones(projectId),
     enabled: !!projectId,
-  })
-}
-
-export const useMilestone = (projectId: string, milestoneId: string) => {
-  return useQuery({
-    queryKey: ['milestones', projectId, milestoneId],
-    queryFn: () => progressApi.getMilestone(projectId, milestoneId),
-    enabled: !!projectId && !!milestoneId,
-  })
-}
+  });
+};
 
 export const useCreateMilestone = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
+  const { addNotification } = uiStore();
 
   return useMutation({
-    mutationFn: ({ projectId, data }: { projectId: string; data: any }) =>
-      progressApi.createMilestone(projectId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['milestones', variables.projectId] })
+    mutationFn: (data: { projectId: string; name: string }) =>
+      progressApi.createMilestone(data),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["milestones", variables.projectId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["progress-summary", variables.projectId],
+      });
+      addNotification({
+        type: "success",
+        message: "Milestone created successfully",
+      });
     },
-  })
-}
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.message || "Failed to create milestone";
+      addNotification({ type: "error", message });
+    },
+  });
+};
 
 export const useUpdateMilestone = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
+  const { addNotification } = uiStore();
 
   return useMutation({
-    mutationFn: ({ projectId, milestoneId, data }: { projectId: string; milestoneId: string; data: any }) =>
-      progressApi.updateMilestone(projectId, milestoneId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['milestones', variables.projectId] })
+    mutationFn: ({
+      milestoneId,
+      progress,
+    }: {
+      milestoneId: string;
+      progress: number;
+    }) => progressApi.updateMilestone(milestoneId, progress),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: ["milestones", data.projectId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["progress-summary", data.projectId],
+      });
+      addNotification({ type: "success", message: "Progress updated" });
     },
-  })
-}
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.message || "Failed to update progress";
+      addNotification({ type: "error", message });
+    },
+  });
+};
 
-export const useCompleteMilestone = () => {
-  const queryClient = useQueryClient()
+export const useDeleteMilestone = () => {
+  const queryClient = useQueryClient();
+  const { addNotification } = uiStore();
 
   return useMutation({
-    mutationFn: ({ projectId, milestoneId }: { projectId: string; milestoneId: string }) =>
-      progressApi.completeMilestone(projectId, milestoneId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['milestones', variables.projectId] })
-      queryClient.invalidateQueries({ queryKey: ['progress', variables.projectId] })
+    mutationFn: (milestoneId: string) =>
+      progressApi.deleteMilestone(milestoneId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: ["milestones", data.projectId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["progress-summary", data.projectId],
+      });
+      addNotification({ type: "success", message: "Milestone deleted" });
     },
-  })
-}
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.message || "Failed to delete milestone";
+      addNotification({ type: "error", message });
+    },
+  });
+};

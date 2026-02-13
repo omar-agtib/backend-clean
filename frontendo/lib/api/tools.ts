@@ -1,43 +1,97 @@
-import { apiClient } from './client'
-import type { Tool, ToolAssignment, ToolMaintenance } from '@/types'
+import { apiClient } from "./client";
+import type {
+  Tool,
+  ToolAssignment,
+  ToolMaintenance,
+  PaginatedResponse,
+} from "@/types";
 
 export const toolsApi = {
-  // Tools
-  getTools: (projectId: string, params?: Record<string, any>) =>
-    apiClient.get(`/api/projects/${projectId}/tools`, { params }),
+  // ✅ Inventory Management
+  getAllTools: async () => {
+    const response = await apiClient.get<Tool[]>("/api/tools");
+    return {
+      items: response.data,
+      total: response.data.length,
+      page: 1,
+      pageSize: response.data.length,
+      totalPages: 1,
+    };
+  },
 
-  getTool: (projectId: string, toolId: string) =>
-    apiClient.get(`/api/projects/${projectId}/tools/${toolId}`),
+  getAvailableTools: async () => {
+    const response = await apiClient.get<Tool[]>("/api/tools/available");
+    return response.data;
+  },
 
-  createTool: (projectId: string, data: Partial<Tool>) =>
-    apiClient.post(`/api/projects/${projectId}/tools`, data),
+  createTool: async (data: { name: string; serialNumber?: string }) => {
+    const response = await apiClient.post<Tool>("/api/tools", data);
+    return response.data;
+  },
 
-  updateTool: (projectId: string, toolId: string, data: Partial<Tool>) =>
-    apiClient.put(`/api/projects/${projectId}/tools/${toolId}`, data),
+  // ✅ Assignments
+  getAssignments: async (projectId: string) => {
+    const response = await apiClient.get<ToolAssignment[]>(
+      `/api/tools/project/${projectId}/assignments`,
+    );
+    return {
+      items: response.data,
+      total: response.data.length,
+      page: 1,
+      pageSize: response.data.length,
+      totalPages: 1,
+    };
+  },
 
-  deleteTool: (projectId: string, toolId: string) =>
-    apiClient.delete(`/api/projects/${projectId}/tools/${toolId}`),
+  getActiveAssignments: async (projectId: string) => {
+    const response = await apiClient.get<ToolAssignment[]>(
+      `/api/tools/project/${projectId}/assigned`,
+    );
+    return response.data;
+  },
 
-  // Tool Assignments
-  getAssignments: (projectId: string, params?: Record<string, any>) =>
-    apiClient.get(`/api/projects/${projectId}/tool-assignments`, { params }),
+  assignTool: async (data: {
+    toolId: string;
+    projectId: string;
+    assignedTo: string;
+  }) => {
+    const response = await apiClient.post<ToolAssignment>(
+      "/api/tools/assign",
+      data,
+    );
+    return response.data;
+  },
 
-  assignTool: (projectId: string, data: Partial<ToolAssignment>) =>
-    apiClient.post(`/api/projects/${projectId}/tool-assignments`, data),
+  returnTool: async (data: { toolId: string }) => {
+    const response = await apiClient.post("/api/tools/return", data);
+    return response.data;
+  },
 
-  updateAssignment: (projectId: string, assignmentId: string, data: Partial<ToolAssignment>) =>
-    apiClient.put(`/api/projects/${projectId}/tool-assignments/${assignmentId}`, data),
+  // ✅ Maintenance
+  getMaintenance: async (projectId: string) => {
+    const response = await apiClient.get<ToolMaintenance[]>(
+      `/api/tools/project/${projectId}/maintenance`,
+    );
+    return response.data;
+  },
 
-  unassignTool: (projectId: string, assignmentId: string) =>
-    apiClient.delete(`/api/projects/${projectId}/tool-assignments/${assignmentId}`),
+  startMaintenance: async (data: {
+    toolId: string;
+    projectId: string;
+    description: string;
+  }) => {
+    const response = await apiClient.post<ToolMaintenance>(
+      "/api/tools/maintenance/start",
+      data,
+    );
+    return response.data;
+  },
 
-  // Maintenance
-  getMaintenance: (projectId: string, toolId: string) =>
-    apiClient.get(`/api/projects/${projectId}/tools/${toolId}/maintenance`),
-
-  scheduleMaintenance: (projectId: string, toolId: string, data: Partial<ToolMaintenance>) =>
-    apiClient.post(`/api/projects/${projectId}/tools/${toolId}/maintenance`, data),
-
-  completeMaintenance: (projectId: string, toolId: string, maintenanceId: string) =>
-    apiClient.post(`/api/projects/${projectId}/tools/${toolId}/maintenance/${maintenanceId}/complete`, {}),
-}
+  completeMaintenance: async (data: { maintenanceId: string }) => {
+    const response = await apiClient.post(
+      "/api/tools/maintenance/complete",
+      data,
+    );
+    return response.data;
+  },
+};

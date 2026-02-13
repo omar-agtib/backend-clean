@@ -1,104 +1,115 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { stockApi } from '@/lib/api/stock'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { stockApi } from "@/lib/api/stock";
+import { uiStore } from "@/store/ui-store";
 
-export const useProducts = (projectId: string, params?: Record<string, any>) => {
+// ✅ Products (Global Catalog)
+export const useAllProducts = () => {
   return useQuery({
-    queryKey: ['products', projectId, params],
-    queryFn: () => stockApi.getProducts(projectId, params),
-    enabled: !!projectId,
-  })
-}
-
-export const useProduct = (projectId: string, productId: string) => {
-  return useQuery({
-    queryKey: ['products', projectId, productId],
-    queryFn: () => stockApi.getProduct(projectId, productId),
-    enabled: !!projectId && !!productId,
-  })
-}
+    queryKey: ["products-catalog"],
+    queryFn: () => stockApi.getAllProducts(),
+  });
+};
 
 export const useCreateProduct = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
+  const { addNotification } = uiStore();
 
   return useMutation({
-    mutationFn: ({ projectId, data }: { projectId: string; data: any }) =>
-      stockApi.createProduct(projectId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['products', variables.projectId] })
-      queryClient.invalidateQueries({ queryKey: ['stock-summary', variables.projectId] })
+    mutationFn: (data: { name: string; sku?: string; unit?: string }) =>
+      stockApi.createProduct(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products-catalog"] });
+      addNotification({
+        type: "success",
+        message: "Product created successfully",
+      });
     },
-  })
-}
-
-export const useUpdateProduct = () => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ projectId, productId, data }: { projectId: string; productId: string; data: any }) =>
-      stockApi.updateProduct(projectId, productId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['products', variables.projectId] })
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.message || "Failed to create product";
+      addNotification({ type: "error", message });
     },
-  })
-}
+  });
+};
 
-export const useDeleteProduct = () => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ projectId, productId }: { projectId: string; productId: string }) =>
-      stockApi.deleteProduct(projectId, productId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['products', variables.projectId] })
-    },
-  })
-}
-
-export const useStockItems = (projectId: string, productId: string) => {
+// ✅ Stock Items (Project inventory)
+export const useStockByProject = (projectId: string) => {
   return useQuery({
-    queryKey: ['stock-items', projectId, productId],
-    queryFn: () => stockApi.getStockItems(projectId, productId),
-    enabled: !!projectId && !!productId,
-  })
-}
+    queryKey: ["stock-items", projectId],
+    queryFn: () => stockApi.getStockByProject(projectId),
+    enabled: !!projectId,
+  });
+};
 
 export const useCreateStockItem = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
+  const { addNotification } = uiStore();
 
   return useMutation({
-    mutationFn: ({ projectId, productId, data }: { projectId: string; productId: string; data: any }) =>
-      stockApi.createStockItem(projectId, productId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['stock-items', variables.projectId, variables.productId] })
+    mutationFn: (data: {
+      projectId: string;
+      productId: string;
+      quantity?: number;
+      location?: string;
+    }) => stockApi.createStockItem(data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: ["stock-items", data.projectId],
+      });
+      addNotification({ type: "success", message: "Stock item added" });
     },
-  })
-}
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.message || "Failed to add stock item";
+      addNotification({ type: "error", message });
+    },
+  });
+};
 
-export const useStockMovements = (projectId: string, params?: Record<string, any>) => {
-  return useQuery({
-    queryKey: ['stock-movements', projectId, params],
-    queryFn: () => stockApi.getMovements(projectId, params),
-    enabled: !!projectId,
-  })
-}
-
-export const useCreateMovement = () => {
-  const queryClient = useQueryClient()
+export const useAdjustStock = () => {
+  const queryClient = useQueryClient();
+  const { addNotification } = uiStore();
 
   return useMutation({
-    mutationFn: ({ projectId, data }: { projectId: string; data: any }) =>
-      stockApi.createMovement(projectId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['stock-movements', variables.projectId] })
-      queryClient.invalidateQueries({ queryKey: ['stock-summary', variables.projectId] })
+    mutationFn: (data: {
+      stockItemId: string;
+      projectId: string;
+      type: "IN" | "OUT";
+      quantity: number;
+      reason: string;
+    }) => stockApi.adjustStock(data),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["stock-items", variables.projectId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["stock-movements", variables.projectId],
+      });
+      addNotification({
+        type: "success",
+        message: `Stock ${variables.type === "IN" ? "added" : "removed"}`,
+      });
     },
-  })
-}
+    onError: (error: any) => {
+      const message = error.response?.data?.message || "Failed to adjust stock";
+      addNotification({ type: "error", message });
+    },
+  });
+};
 
-export const useStockSummary = (projectId: string) => {
+// ✅ Stock Movements (History)
+export const useMovementsByProject = (projectId: string) => {
   return useQuery({
-    queryKey: ['stock-summary', projectId],
-    queryFn: () => stockApi.getStockSummary(projectId),
+    queryKey: ["stock-movements", projectId],
+    queryFn: () => stockApi.getMovementsByProject(projectId),
     enabled: !!projectId,
-  })
-}
+  });
+};
+
+export const useMovementsByItem = (stockItemId: string) => {
+  return useQuery({
+    queryKey: ["stock-movements", stockItemId],
+    queryFn: () => stockApi.getMovementsByItem(stockItemId),
+    enabled: !!stockItemId,
+  });
+};
