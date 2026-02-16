@@ -15,6 +15,7 @@ import { LogOut, Settings, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ProjectSelector } from "@/components/projects/project-selector";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 // Routes that need project selection
 const PROJECT_ROUTES = [
@@ -62,7 +63,10 @@ export function Navbar() {
         )}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2">
+        {/* Notification Bell */}
+        <NotificationBell />
+
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -1,134 +1,110 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { billingApi } from '@/lib/api/billing'
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { billingApi } from "@/lib/api/billing";
+import { uiStore } from "@/store/ui-store";
 
-export const useInvoices = (projectId: string, params?: Record<string, any>) => {
+export const useInvoices = (projectId: string) => {
   return useQuery({
-    queryKey: ['invoices', projectId, params],
-    queryFn: () => billingApi.getInvoices(projectId, params),
+    queryKey: ["invoices", projectId],
+    queryFn: () => billingApi.getInvoices(projectId),
     enabled: !!projectId,
-  })
-}
+  });
+};
 
-export const useInvoice = (projectId: string, invoiceId: string) => {
+export const useInvoice = (invoiceId: string) => {
   return useQuery({
-    queryKey: ['invoices', projectId, invoiceId],
-    queryFn: () => billingApi.getInvoice(projectId, invoiceId),
-    enabled: !!projectId && !!invoiceId,
-  })
-}
+    queryKey: ["invoices", invoiceId],
+    queryFn: () => billingApi.getInvoice(invoiceId),
+    enabled: !!invoiceId,
+  });
+};
 
 export const useCreateInvoice = () => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
+  const { addNotification } = uiStore();
 
   return useMutation({
-    mutationFn: ({ projectId, data }: { projectId: string; data: any }) =>
-      billingApi.createInvoice(projectId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', variables.projectId] })
-      queryClient.invalidateQueries({ queryKey: ['billing-summary', variables.projectId] })
+    mutationFn: (data: { projectId: string; amount: number }) =>
+      billingApi.createInvoice(data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["invoices", data.projectId] });
+      queryClient.invalidateQueries({
+        queryKey: ["billing-summary", data.projectId],
+      });
+      addNotification({
+        type: "success",
+        message: "Invoice created successfully",
+      });
     },
-  })
-}
-
-export const useUpdateInvoice = () => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ projectId, invoiceId, data }: { projectId: string; invoiceId: string; data: any }) =>
-      billingApi.updateInvoice(projectId, invoiceId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', variables.projectId] })
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.message || "Failed to create invoice";
+      addNotification({ type: "error", message });
     },
-  })
-}
+  });
+};
 
-export const useDeleteInvoice = () => {
-  const queryClient = useQueryClient()
+export const useMarkPaid = () => {
+  const queryClient = useQueryClient();
+  const { addNotification } = uiStore();
 
   return useMutation({
-    mutationFn: ({ projectId, invoiceId }: { projectId: string; invoiceId: string }) =>
-      billingApi.deleteInvoice(projectId, invoiceId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', variables.projectId] })
+    mutationFn: ({
+      invoiceId,
+      projectId,
+    }: {
+      invoiceId: string;
+      projectId: string;
+    }) => billingApi.markPaid(invoiceId),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["invoices", variables.projectId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["billing-summary", variables.projectId],
+      });
+      addNotification({ type: "success", message: "Invoice marked as paid" });
     },
-  })
-}
-
-export const useDownloadInvoice = () => {
-  return useMutation({
-    mutationFn: ({ projectId, invoiceId }: { projectId: string; invoiceId: string }) =>
-      billingApi.downloadInvoice(projectId, invoiceId),
-  })
-}
-
-export const useBillingRules = (projectId: string) => {
-  return useQuery({
-    queryKey: ['billing-rules', projectId],
-    queryFn: () => billingApi.getBillingRules(projectId),
-    enabled: !!projectId,
-  })
-}
-
-export const useCreateBillingRule = () => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ projectId, data }: { projectId: string; data: any }) =>
-      billingApi.createBillingRule(projectId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['billing-rules', variables.projectId] })
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.message || "Failed to mark invoice as paid";
+      addNotification({ type: "error", message });
     },
-  })
-}
+  });
+};
 
-export const useUpdateBillingRule = () => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ projectId, ruleId, data }: { projectId: string; ruleId: string; data: any }) =>
-      billingApi.updateBillingRule(projectId, ruleId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['billing-rules', variables.projectId] })
-    },
-  })
-}
-
-export const useDeleteBillingRule = () => {
-  const queryClient = useQueryClient()
+export const useCancelInvoice = () => {
+  const queryClient = useQueryClient();
+  const { addNotification } = uiStore();
 
   return useMutation({
-    mutationFn: ({ projectId, ruleId }: { projectId: string; ruleId: string }) =>
-      billingApi.deleteBillingRule(projectId, ruleId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['billing-rules', variables.projectId] })
+    mutationFn: ({
+      invoiceId,
+      projectId,
+    }: {
+      invoiceId: string;
+      projectId: string;
+    }) => billingApi.cancelInvoice(invoiceId),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["invoices", variables.projectId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["billing-summary", variables.projectId],
+      });
+      addNotification({ type: "success", message: "Invoice cancelled" });
     },
-  })
-}
-
-export const useCounters = (projectId: string) => {
-  return useQuery({
-    queryKey: ['counters', projectId],
-    queryFn: () => billingApi.getCounters(projectId),
-    enabled: !!projectId,
-  })
-}
-
-export const useUpdateCounter = () => {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ projectId, counterId, data }: { projectId: string; counterId: string; data: any }) =>
-      billingApi.updateCounter(projectId, counterId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['counters', variables.projectId] })
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.message || "Failed to cancel invoice";
+      addNotification({ type: "error", message });
     },
-  })
-}
+  });
+};
 
 export const useBillingSummary = (projectId: string) => {
   return useQuery({
-    queryKey: ['billing-summary', projectId],
-    queryFn: () => billingApi.getBillingSummary(projectId),
+    queryKey: ["billing-summary", projectId],
+    queryFn: () => billingApi.getSummary(projectId),
     enabled: !!projectId,
-  })
-}
+  });
+};

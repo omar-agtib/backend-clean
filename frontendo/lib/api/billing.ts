@@ -1,49 +1,45 @@
-import { apiClient } from './client'
-import type { Invoice, BillingRule, Counter } from '@/types'
+import { apiClient } from "./client";
+import type { PaginatedResponse } from "@/types";
 
 export const billingApi = {
-  // Invoices
-  getInvoices: (projectId: string, params?: Record<string, any>) =>
-    apiClient.get(`/api/projects/${projectId}/invoices`, { params }),
+  // ✅ Invoices - Match backend routes
+  getInvoices: async (projectId: string) => {
+    const response = await apiClient.get<any[]>(
+      `/api/billing/project/${projectId}`,
+    );
+    return {
+      items: response.data,
+      total: response.data.length,
+      page: 1,
+      pageSize: response.data.length,
+      totalPages: 1,
+    };
+  },
 
-  getInvoice: (projectId: string, invoiceId: string) =>
-    apiClient.get(`/api/projects/${projectId}/invoices/${invoiceId}`),
+  getInvoice: async (invoiceId: string) => {
+    const response = await apiClient.get(`/api/billing/${invoiceId}`);
+    return response.data;
+  },
 
-  createInvoice: (projectId: string, data: Partial<Invoice>) =>
-    apiClient.post(`/api/projects/${projectId}/invoices`, data),
+  createInvoice: async (data: { projectId: string; amount: number }) => {
+    const response = await apiClient.post("/api/billing", data);
+    return response.data;
+  },
 
-  updateInvoice: (projectId: string, invoiceId: string, data: Partial<Invoice>) =>
-    apiClient.put(`/api/projects/${projectId}/invoices/${invoiceId}`, data),
+  markPaid: async (invoiceId: string) => {
+    const response = await apiClient.post(`/api/billing/${invoiceId}/pay`);
+    return response.data;
+  },
 
-  deleteInvoice: (projectId: string, invoiceId: string) =>
-    apiClient.delete(`/api/projects/${projectId}/invoices/${invoiceId}`),
+  cancelInvoice: async (invoiceId: string) => {
+    const response = await apiClient.post(`/api/billing/${invoiceId}/cancel`);
+    return response.data;
+  },
 
-  downloadInvoice: (projectId: string, invoiceId: string) =>
-    apiClient.get(`/api/projects/${projectId}/invoices/${invoiceId}/download`, {
-      responseType: 'blob',
-    }),
-
-  // Billing Rules
-  getBillingRules: (projectId: string) =>
-    apiClient.get(`/api/projects/${projectId}/billing-rules`),
-
-  createBillingRule: (projectId: string, data: Partial<BillingRule>) =>
-    apiClient.post(`/api/projects/${projectId}/billing-rules`, data),
-
-  updateBillingRule: (projectId: string, ruleId: string, data: Partial<BillingRule>) =>
-    apiClient.put(`/api/projects/${projectId}/billing-rules/${ruleId}`, data),
-
-  deleteBillingRule: (projectId: string, ruleId: string) =>
-    apiClient.delete(`/api/projects/${projectId}/billing-rules/${ruleId}`),
-
-  // Counters
-  getCounters: (projectId: string) =>
-    apiClient.get(`/api/projects/${projectId}/counters`),
-
-  updateCounter: (projectId: string, counterId: string, data: Partial<Counter>) =>
-    apiClient.put(`/api/projects/${projectId}/counters/${counterId}`, data),
-
-  // Billing Summary
-  getBillingSummary: (projectId: string) =>
-    apiClient.get(`/api/projects/${projectId}/billing/summary`),
-}
+  getSummary: async (projectId: string) => {
+    const response = await apiClient.get(
+      `/api/billing/project/${projectId}/summary`,
+    );
+    return response.data;
+  },
+};
