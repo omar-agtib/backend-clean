@@ -18,4 +18,7 @@ router.patch("/:annotationId", auth, ctrl.update);
 // delete annotation (right click delete)
 router.delete("/:annotationId", auth, ctrl.remove);
 
+router.post("/:annotationId/comments", auth, ctrl.addComment);
+router.delete("/:annotationId/comments/:commentId", auth, ctrl.deleteComment);
+
 module.exports = router;

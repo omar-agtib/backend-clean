@@ -78,7 +78,7 @@ exports.getAnnotations = async (planVersionId) => {
 };
 
 /**
- * Update annotation (move pin / edit content)
+ * Update annotation (move pin / edit content / change priority)
  */
 exports.updateAnnotation = async (annotationId, data) => {
   if (!mongoose.isValidObjectId(annotationId)) {
@@ -103,6 +103,7 @@ exports.updateAnnotation = async (annotationId, data) => {
   if (computedGeometry !== undefined) update.geometry = computedGeometry;
   if (body.content !== undefined) update.content = body.content;
   if (body.type !== undefined) update.type = body.type;
+  if (body.priority !== undefined) update.priority = body.priority; // ✅ Added priority
 
   // ✅ allow setting content to empty string
   if (body.content === "") update.content = "";
@@ -116,8 +117,8 @@ exports.updateAnnotation = async (annotationId, data) => {
   const updated = await Annotation.findByIdAndUpdate(
     annotationId,
     { $set: update },
-    { new: true }
-  );
+    { new: true },
+  ).populate("comments.userId", "name email"); // ✅ Populate comments
 
   if (!updated) {
     const err = new Error("Annotation not found");
@@ -148,4 +149,77 @@ exports.deleteAnnotation = async (annotationId) => {
 
   planEvents.annotationDeleted(annotation.projectId, annotationId);
   return { message: "Annotation deleted", annotationId };
+};
+
+exports.addComment = async (annotationId, userId, text) => {
+  if (!mongoose.isValidObjectId(annotationId)) {
+    const err = new Error("Invalid annotationId");
+    err.status = 400;
+    throw err;
+  }
+
+  if (!text || !String(text).trim()) {
+    const err = new Error("Comment text is required");
+    err.status = 400;
+    throw err;
+  }
+
+  const annotation = await Annotation.findById(annotationId);
+  if (!annotation) {
+    const err = new Error("Annotation not found");
+    err.status = 404;
+    throw err;
+  }
+
+  annotation.comments.push({
+    userId,
+    text: String(text).trim(),
+    createdAt: new Date(),
+  });
+
+  await annotation.save();
+
+  // Populate user details in the returned comment
+  await annotation.populate("comments.userId", "name email");
+
+  planEvents.annotationUpdated(annotation.projectId, annotation);
+  return annotation;
+};
+
+/**
+ * Delete comment from annotation
+ */
+exports.deleteComment = async (annotationId, commentId, userId) => {
+  if (!mongoose.isValidObjectId(annotationId)) {
+    const err = new Error("Invalid annotationId");
+    err.status = 400;
+    throw err;
+  }
+
+  const annotation = await Annotation.findById(annotationId);
+  if (!annotation) {
+    const err = new Error("Annotation not found");
+    err.status = 404;
+    throw err;
+  }
+
+  const comment = annotation.comments.id(commentId);
+  if (!comment) {
+    const err = new Error("Comment not found");
+    err.status = 404;
+    throw err;
+  }
+
+  // Only allow deleting own comments
+  if (String(comment.userId) !== String(userId)) {
+    const err = new Error("You can only delete your own comments");
+    err.status = 403;
+    throw err;
+  }
+
+  comment.deleteOne();
+  await annotation.save();
+
+  planEvents.annotationUpdated(annotation.projectId, annotation);
+  return annotation;
 };

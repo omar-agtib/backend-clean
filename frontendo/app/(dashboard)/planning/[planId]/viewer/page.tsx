@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   useAnnotations,
   useCreateAnnotation,
@@ -10,22 +11,111 @@ import {
 import { planningApi } from "@/lib/api/planning";
 import { LoadingState } from "@/components/common/loading-state";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   ArrowLeft,
   Download,
   ZoomIn,
   ZoomOut,
-  Pencil,
   MapPin,
-  Type,
   Trash2,
   MousePointer,
-  Save,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from "lucide-react";
+import { AnnotationDetailsDialog } from "@/components/planning/annotation-details-dialog";
+import type { Annotation } from "@/types";
 
-type AnnotationTool = "select" | "draw" | "pin" | "text";
+// Dynamically import PDF viewer
+const PDFDocumentViewer = dynamic(
+  () =>
+    import("@/components/planning/pdf-document-viewer").then(
+      (mod) => mod.PDFDocumentViewer,
+    ),
+  { ssr: false, loading: () => <LoadingState /> },
+);
+
+type AnnotationTool = "select" | "pin";
+
+// Priority colors
+const PRIORITY_COLORS: Record<string, string> = {
+  LOW: "#3b82f6", // blue
+  MEDIUM: "#eab308", // yellow
+  HIGH: "#f97316", // orange
+  CRITICAL: "#ef4444", // red
+};
+
+// Toast Component
+function AnnotationToast({
+  annotation,
+  onClose,
+  onClick,
+}: {
+  annotation: any;
+  onClose: () => void;
+  onClick: () => void;
+}) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 5000); // Auto-close after 5 seconds
+
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const priorityColor = PRIORITY_COLORS[annotation.priority || "MEDIUM"];
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-border p-4 min-w-[300px] max-w-[400px] animate-in slide-in-from-right">
+      <div className="flex items-start gap-3">
+        <div
+          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: `${priorityColor}20` }}
+        >
+          <MapPin className="h-5 w-5" style={{ color: priorityColor }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="font-semibold text-sm">Pin Added</h4>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 -mr-2"
+              onClick={onClose}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {annotation.content || "New pin annotation"}
+          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <span
+              className="text-xs px-2 py-0.5 rounded"
+              style={{
+                backgroundColor: `${priorityColor}20`,
+                color: priorityColor,
+              }}
+            >
+              {annotation.priority || "MEDIUM"}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Page {annotation.geometry.page || 1}
+            </span>
+          </div>
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0 mt-2 text-xs"
+            onClick={onClick}
+          >
+            View Details →
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function PlanViewerPage() {
   const params = useParams();
@@ -39,22 +129,25 @@ export default function PlanViewerPage() {
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [numPages, setNumPages] = useState<number>(0);
+  const [pageNumber, setPageNumber] = useState(1);
   const [zoom, setZoom] = useState(1);
   const [activeTool, setActiveTool] = useState<AnnotationTool>("select");
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentPath, setCurrentPath] = useState<
-    Array<{ x: number; y: number }>
-  >([]);
-  const [showTextInput, setShowTextInput] = useState(false);
-  const [textPosition, setTextPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-  const [textContent, setTextContent] = useState("");
+  const [selectedAnnotation, setSelectedAnnotation] =
+    useState<Annotation | null>(null);
+  const [showAnnotationDialog, setShowAnnotationDialog] = useState(false);
+  const [toasts, setToasts] = useState<Array<{ id: string; annotation: any }>>(
+    [],
+  );
 
   const { data: annotations = [], refetch } = useAnnotations(versionId || "");
   const createAnnotation = useCreateAnnotation();
   const deleteAnnotation = useDeleteAnnotation();
+
+  // Filter annotations by current page
+  const pageAnnotations = annotations.filter(
+    (ann: any) => !ann.geometry.page || ann.geometry.page === pageNumber,
+  );
 
   // Load PDF URL
   useEffect(() => {
@@ -75,6 +168,10 @@ export default function PlanViewerPage() {
     loadPdf();
   }, [versionId]);
 
+  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
+    setNumPages(numPages);
+  }
+
   // Draw annotations on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -83,87 +180,52 @@ export default function PlanViewerPage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw all saved annotations
-    annotations.forEach((ann: any) => {
+    // Draw only PIN annotations for current page
+    pageAnnotations.forEach((ann: any) => {
+      if (ann.type !== "PIN") return;
+
       ctx.save();
 
-      if (ann.type === "PIN") {
-        // Draw pin marker
-        ctx.fillStyle = "#ef4444";
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(
-          ann.geometry.x * zoom,
-          ann.geometry.y * zoom,
-          8,
-          0,
-          Math.PI * 2,
+      const color = PRIORITY_COLORS[ann.priority || "MEDIUM"];
+
+      // Draw pin circle
+      ctx.fillStyle = color;
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(ann.geometry.x * zoom, ann.geometry.y * zoom, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw label if content exists
+      if (ann.content) {
+        ctx.font = "bold 12px Arial";
+        const text = ann.content;
+        const textWidth = ctx.measureText(text).width;
+
+        // Background
+        ctx.fillStyle = color;
+        ctx.fillRect(
+          ann.geometry.x * zoom + 14,
+          ann.geometry.y * zoom - 8,
+          textWidth + 8,
+          18,
         );
-        ctx.fill();
-        ctx.stroke();
 
-        // Draw pin label
-        if (ann.content) {
-          ctx.fillStyle = "#1f2937";
-          ctx.font = "12px Arial";
-          ctx.fillText(
-            ann.content,
-            ann.geometry.x * zoom + 12,
-            ann.geometry.y * zoom + 4,
-          );
-        }
-      } else if (
-        ann.type === "DRAW" &&
-        ann.geometry.points &&
-        ann.geometry.points.length > 2
-      ) {
-        // Draw freehand path
-        ctx.strokeStyle = "#3b82f6";
-        ctx.lineWidth = 3;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.beginPath();
-
-        for (let i = 0; i < ann.geometry.points.length; i += 2) {
-          const x = ann.geometry.points[i] * zoom;
-          const y = ann.geometry.points[i + 1] * zoom;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-      } else if (ann.type === "TEXT") {
-        // Draw text annotation
-        ctx.fillStyle = "#10b981";
-        ctx.font = "14px Arial";
+        // Text
+        ctx.fillStyle = "#fff";
         ctx.fillText(
-          ann.content || "",
-          ann.geometry.x * zoom,
-          ann.geometry.y * zoom,
+          text,
+          ann.geometry.x * zoom + 18,
+          ann.geometry.y * zoom + 4,
         );
       }
 
       ctx.restore();
     });
-
-    // Draw current path while drawing
-    if (isDrawing && currentPath.length > 0) {
-      ctx.strokeStyle = "#3b82f6";
-      ctx.lineWidth = 3;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.beginPath();
-
-      currentPath.forEach((point, i) => {
-        if (i === 0) ctx.moveTo(point.x * zoom, point.y * zoom);
-        else ctx.lineTo(point.x * zoom, point.y * zoom);
-      });
-      ctx.stroke();
-    }
-  }, [annotations, currentPath, isDrawing, zoom]);
+  }, [pageAnnotations, zoom]);
 
   const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -176,92 +238,54 @@ export default function PlanViewerPage() {
     };
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool === "select") return;
-
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const coords = getCanvasCoords(e);
 
-    if (activeTool === "draw") {
-      setIsDrawing(true);
-      setCurrentPath([coords]);
+    if (activeTool === "select") {
+      // Find clicked annotation
+      const clicked = pageAnnotations.find((ann: any) => {
+        if (ann.type === "PIN") {
+          const dx = ann.geometry.x - coords.x;
+          const dy = ann.geometry.y - coords.y;
+          return Math.sqrt(dx * dx + dy * dy) < 15;
+        }
+        return false;
+      });
+
+      if (clicked) {
+        setSelectedAnnotation(clicked as Annotation);
+        setShowAnnotationDialog(true);
+      }
     } else if (activeTool === "pin") {
-      // Create pin immediately
+      // Create pin annotation
       createAnnotation.mutate(
         {
           planVersionId: versionId!,
           type: "PIN",
-          geometry: { x: coords.x, y: coords.y },
-          content: "Pin",
-        },
-        {
-          onSuccess: () => refetch(),
-        },
-      );
-    } else if (activeTool === "text") {
-      setTextPosition(coords);
-      setShowTextInput(true);
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || activeTool !== "draw") return;
-
-    const coords = getCanvasCoords(e);
-    setCurrentPath((prev) => [...prev, coords]);
-  };
-
-  const handleMouseUp = () => {
-    if (isDrawing && currentPath.length > 2) {
-      // Convert path to flat array [x1, y1, x2, y2, ...]
-      const points = currentPath.flatMap((p) => [p.x, p.y]);
-
-      createAnnotation.mutate(
-        {
-          planVersionId: versionId!,
-          type: "DRAW",
           geometry: {
-            x: currentPath[0].x,
-            y: currentPath[0].y,
-            points,
+            x: coords.x,
+            y: coords.y,
+            page: pageNumber,
           },
+          content: "Pin",
+          priority: "MEDIUM",
         },
         {
-          onSuccess: () => {
+          onSuccess: (newAnnotation) => {
             refetch();
-            setCurrentPath([]);
+
+            // Show toast
+            const toastId = Date.now().toString();
+            setToasts((prev) => [
+              ...prev,
+              { id: toastId, annotation: newAnnotation },
+            ]);
+
+            // Switch back to select mode
+            setActiveTool("select");
           },
         },
       );
-    }
-    setIsDrawing(false);
-  };
-
-  const handleSaveText = () => {
-    if (!textPosition || !textContent.trim()) return;
-
-    createAnnotation.mutate(
-      {
-        planVersionId: versionId!,
-        type: "TEXT",
-        geometry: { x: textPosition.x, y: textPosition.y },
-        content: textContent,
-      },
-      {
-        onSuccess: () => {
-          refetch();
-          setTextContent("");
-          setTextPosition(null);
-          setShowTextInput(false);
-        },
-      },
-    );
-  };
-
-  const handleDeleteAnnotation = (annotationId: string) => {
-    if (confirm("Delete this annotation?")) {
-      deleteAnnotation.mutate(annotationId, {
-        onSuccess: () => refetch(),
-      });
     }
   };
 
@@ -269,10 +293,17 @@ export default function PlanViewerPage() {
     if (!versionId) return;
     try {
       const { url } = await planningApi.getVersionSignedUrl(versionId);
-      window.open(url, "_blank");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "plan.pdf";
+      a.click();
     } catch (error) {
       console.error("Failed to download:", error);
     }
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
   if (isLoading) {
@@ -288,198 +319,153 @@ export default function PlanViewerPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Toolbar */}
-      <div className="border-b bg-white dark:bg-gray-800 p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push(`/planning/${planId}`)}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="flex items-center gap-2 border-r pr-4">
+    <>
+      <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
+        {/* Toolbar */}
+        <div className="border-b bg-white dark:bg-gray-800 p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
               <Button
-                variant={activeTool === "select" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveTool("select")}
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push(`/planning/${planId}`)}
               >
-                <MousePointer className="h-4 w-4 mr-1" />
-                Select
+                <ArrowLeft className="h-4 w-4" />
               </Button>
-              <Button
-                variant={activeTool === "draw" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveTool("draw")}
-              >
-                <Pencil className="h-4 w-4 mr-1" />
-                Draw
-              </Button>
-              <Button
-                variant={activeTool === "pin" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveTool("pin")}
-              >
-                <MapPin className="h-4 w-4 mr-1" />
-                Pin
-              </Button>
-              <Button
-                variant={activeTool === "text" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveTool("text")}
-              >
-                <Type className="h-4 w-4 mr-1" />
-                Text
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
-            >
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <span className="text-sm min-w-[60px] text-center font-medium">
-              {Math.round(zoom * 100)}%
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setZoom(Math.min(2, zoom + 0.1))}
-            >
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleDownload}>
-              <Download className="h-4 w-4 mr-1" />
-              Download
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Viewer Area */}
-      <div className="flex-1 overflow-auto relative" ref={containerRef}>
-        <div className="flex items-start justify-center min-h-full p-8">
-          <div
-            className="relative shadow-2xl"
-            style={{
-              transform: `scale(${zoom})`,
-              transformOrigin: "top center",
-            }}
-          >
-            {/* PDF Embed */}
-            <embed
-              src={pdfUrl}
-              type="application/pdf"
-              width="800"
-              height="1000"
-              className="bg-white"
-            />
-
-            {/* Canvas Overlay */}
-            <canvas
-              ref={canvasRef}
-              width={800}
-              height={1000}
-              className="absolute top-0 left-0 cursor-crosshair"
-              style={{
-                pointerEvents: activeTool === "select" ? "none" : "auto",
-              }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Annotations Sidebar */}
-      {annotations.length > 0 && (
-        <div className="absolute top-24 right-4 w-64 space-y-2 max-h-[calc(100vh-8rem)] overflow-auto">
-          <Card className="p-3 bg-white dark:bg-gray-800">
-            <h3 className="font-semibold mb-2">
-              Annotations ({annotations.length})
-            </h3>
-            <div className="space-y-2">
-              {annotations.map((ann: any) => (
-                <div
-                  key={ann._id}
-                  className="flex items-start justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded text-sm"
+              <div className="flex items-center gap-2 border-r pr-4">
+                <Button
+                  variant={activeTool === "select" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveTool("select")}
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      {ann.type === "PIN" && (
-                        <MapPin className="h-3 w-3 text-red-500" />
-                      )}
-                      {ann.type === "DRAW" && (
-                        <Pencil className="h-3 w-3 text-blue-500" />
-                      )}
-                      {ann.type === "TEXT" && (
-                        <Type className="h-3 w-3 text-green-500" />
-                      )}
-                      <span className="text-xs font-medium">{ann.type}</span>
-                    </div>
-                    {ann.content && (
-                      <p className="text-xs truncate">{ann.content}</p>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => handleDeleteAnnotation(ann._id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
+                  <MousePointer className="h-4 w-4 mr-1" />
+                  Select
+                </Button>
+                <Button
+                  variant={activeTool === "pin" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveTool("pin")}
+                >
+                  <MapPin className="h-4 w-4 mr-1" />
+                  Add Pin
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {pageAnnotations.length}{" "}
+                {pageAnnotations.length === 1 ? "annotation" : "annotations"} on
+                this page
+              </div>
             </div>
-          </Card>
-        </div>
-      )}
 
-      {/* Text Input Dialog */}
-      {showTextInput && textPosition && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="p-6 w-96 bg-white dark:bg-gray-800">
-            <h3 className="font-semibold mb-4">Add Text Annotation</h3>
-            <Input
-              placeholder="Enter text..."
-              value={textContent}
-              onChange={(e) => setTextContent(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && textContent.trim()) {
-                  handleSaveText();
-                }
-              }}
-              autoFocus
-              className="mb-4"
-            />
-            <div className="flex gap-2">
-              <Button onClick={handleSaveText} disabled={!textContent.trim()}>
-                <Save className="h-4 w-4 mr-1" />
-                Save
-              </Button>
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                onClick={() => {
-                  setShowTextInput(false);
-                  setTextPosition(null);
-                  setTextContent("");
-                }}
+                size="sm"
+                onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+                disabled={pageNumber <= 1}
               >
-                Cancel
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm min-w-[100px] text-center font-medium">
+                Page {pageNumber} / {numPages || 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPageNumber((p) => Math.min(numPages, p + 1))}
+                disabled={pageNumber >= numPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <div className="border-l pl-2 ml-2 flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <span className="text-sm min-w-[60px] text-center font-medium">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setZoom(Math.min(2, zoom + 0.1))}
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleDownload}>
+                <Download className="h-4 w-4 mr-1" />
+                Download
               </Button>
             </div>
-          </Card>
+          </div>
         </div>
-      )}
-    </div>
+
+        {/* Viewer Area */}
+        <div className="flex-1 overflow-auto relative" ref={containerRef}>
+          <div className="flex items-start justify-center min-h-full p-8">
+            <div
+              className="relative shadow-2xl"
+              style={{
+                transform: `scale(${zoom})`,
+                transformOrigin: "top center",
+              }}
+            >
+              {/* PDF Document */}
+              <PDFDocumentViewer
+                url={pdfUrl}
+                pageNumber={pageNumber}
+                onLoadSuccess={onDocumentLoadSuccess}
+                width={800}
+              />
+
+              {/* Canvas Overlay */}
+              <canvas
+                ref={canvasRef}
+                width={800}
+                height={1000}
+                className="absolute top-0 left-0"
+                style={{
+                  cursor: activeTool === "select" ? "pointer" : "crosshair",
+                  pointerEvents: "auto",
+                }}
+                onClick={handleCanvasClick}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Toast Container */}
+        <div className="fixed top-20 right-4 z-50 flex flex-col gap-2">
+          {toasts.map((toast) => (
+            <AnnotationToast
+              key={toast.id}
+              annotation={toast.annotation}
+              onClose={() => removeToast(toast.id)}
+              onClick={() => {
+                setSelectedAnnotation(toast.annotation);
+                setShowAnnotationDialog(true);
+                removeToast(toast.id);
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Annotation Details Dialog */}
+      <AnnotationDetailsDialog
+        annotation={selectedAnnotation}
+        open={showAnnotationDialog}
+        onOpenChange={setShowAnnotationDialog}
+        onDeleted={() => {
+          refetch();
+          setShowAnnotationDialog(false);
+        }}
+        onUpdated={() => refetch()}
+      />
+    </>
   );
 }

@@ -183,8 +183,9 @@ export const useUpdateAnnotation = () => {
       data: Partial<any>;
     }) => planningApi.updateAnnotation(annotationId, data),
     onSuccess: (data) => {
+      // ✅ Invalidate all annotation queries
       queryClient.invalidateQueries({
-        queryKey: ["annotations", data.planVersionId],
+        queryKey: ["annotations"],
       });
       addNotification({
         type: "success",
@@ -216,6 +217,62 @@ export const useDeleteAnnotation = () => {
     onError: (error: any) => {
       const message =
         error.response?.data?.message || "Failed to delete annotation";
+      addNotification({ type: "error", message });
+    },
+  });
+};
+
+// ✅ Comments
+export const useAddComment = () => {
+  const queryClient = useQueryClient();
+  const { addNotification } = uiStore();
+
+  return useMutation({
+    mutationFn: ({
+      annotationId,
+      text,
+    }: {
+      annotationId: string;
+      text: string;
+    }) => planningApi.addComment(annotationId, text),
+    onSuccess: (data) => {
+      // ✅ Invalidate all annotation queries
+      queryClient.invalidateQueries({ queryKey: ["annotations"] });
+      addNotification({
+        type: "success",
+        message: "Comment added successfully",
+      });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || "Failed to add comment";
+      addNotification({ type: "error", message });
+    },
+  });
+};
+
+export const useDeleteComment = () => {
+  const queryClient = useQueryClient();
+  const { addNotification } = uiStore();
+
+  return useMutation({
+    mutationFn: ({
+      annotationId,
+      commentId,
+    }: {
+      annotationId: string;
+      commentId: string;
+    }) => planningApi.deleteComment(annotationId, commentId),
+    onSuccess: () => {
+      // ✅ Invalidate all annotation queries
+      queryClient.invalidateQueries({ queryKey: ["annotations"] });
+      addNotification({
+        type: "success",
+        message: "Comment deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.message || "Failed to delete comment";
       addNotification({ type: "error", message });
     },
   });

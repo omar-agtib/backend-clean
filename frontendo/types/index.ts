@@ -284,6 +284,18 @@ export interface Annotation {
     [key: string]: any;
   };
   content?: string;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"; // ✅ Added
+  comments: Array<{
+    // ✅ Added
+    _id: string;
+    userId: {
+      _id: string;
+      name: string;
+      email: string;
+    };
+    text: string;
+    createdAt: string;
+  }>;
   createdBy: string;
   clientId?: string;
   createdAt: string;

@@ -111,4 +111,19 @@ export const planningApi = {
     const response = await apiClient.delete(`/api/annotations/${annotationId}`);
     return response.data;
   },
+
+  addComment: async (annotationId: string, text: string) => {
+    const response = await apiClient.post<Annotation>(
+      `/api/annotations/${annotationId}/comments`,
+      { text },
+    );
+    return response.data;
+  },
+
+  deleteComment: async (annotationId: string, commentId: string) => {
+    const response = await apiClient.delete<Annotation>(
+      `/api/annotations/${annotationId}/comments/${commentId}`,
+    );
+    return response.data;
+  },
 };

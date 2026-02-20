@@ -1,5 +1,20 @@
-// backend/modules/plans/annotation.model.js
 const mongoose = require("mongoose");
+
+const CommentSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  text: {
+    type: String,
+    required: true,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
 
 const AnnotationSchema = new mongoose.Schema(
   {
@@ -30,19 +45,28 @@ const AnnotationSchema = new mongoose.Schema(
 
     content: String,
 
+    // ✅ NEW: Priority field
+    priority: {
+      type: String,
+      enum: ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+      default: "MEDIUM",
+    },
+
+    // ✅ NEW: Comments array
+    comments: [CommentSchema],
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
 
-    // Offline / sync support
     clientId: {
       type: String,
       index: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Annotation", AnnotationSchema);
